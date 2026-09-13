@@ -17,6 +17,20 @@ positional arguments:
                 in puzzles_path. Each puzzle directory must contain piece
                 images/masks plus a pieces.json ground truth, as produced by
                 puzzle_generator/generate.py.
+
+Reproducibility
+---------------
+Repeating a run exactly takes more than --seed. All three of these are needed:
+
+  --seed N            seeds the search's own randomness
+  n_processes: 1      several workers return verified matches in whatever order
+                      they finish, and that order changes the outcome
+  PYTHONHASHSEED=0    python randomises string hashing per process, which
+                      changes the iteration order of the sets of piece ids the
+                      algorithm walks over
+
+Serial runs are noticeably slower, so this is worth doing for results that have
+to be reproducible, and not for large sweeps.
 """
 
 from __future__ import annotations
