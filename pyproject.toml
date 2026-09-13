@@ -6,6 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "piece_assemble"
 version = "0.1.0"
 requires-python = ">=3.11"
+license = {text = "MIT"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
