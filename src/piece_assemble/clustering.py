@@ -63,6 +63,12 @@ class Clustering:
         self.cluster_scorer = cluster_scorer
         self.all_ids = [piece.name for piece in pieces]
 
+        # Optional parts of the algorithm, switchable for ablation purposes.
+        # Overridden per run by __call__.
+        self.use_icp = True
+        self.use_trusted_clusters = True
+        self.use_match_reuse = True
+
         self.reset(True)
         self.set_logging(None)
         self.random = random.Random()
@@ -120,8 +126,22 @@ class Clustering:
         n_processes: int = 4,
         min_complexity: int = 2,
         n_used_matches: int = 40000,
+        use_icp: bool = True,
+        use_trusted_clusters: bool = True,
+        use_match_reuse: bool = True,
     ) -> Cluster | None:
         self.cluster_config = cluster_config
+        self.use_icp = use_icp
+        self.use_trusted_clusters = use_trusted_clusters
+        self.use_match_reuse = use_match_reuse
+
+        # ICP is applied in two places: refining each candidate pairwise match,
+        # and refining piece placement after a cluster merge. Disabling it has
+        # to cover both. icp() returns its initial transformation unchanged when
+        # given no iterations, so zeroing the iteration counts is enough here;
+        # the merge-time counts are zeroed at their own call sites.
+        if not use_icp:
+            icp_max_iters = 0
 
         if self.all_matches is None:
             self.find_candidate_matches(n_used_matches)
@@ -276,9 +296,12 @@ class Clustering:
 
         # Get interesting previous clusters
         previous_clusters = []
-        use_previous_clusters = len(self.clusters) >= 1 and (
-            len(self.clusters[0].piece_ids) > 0.5 * len(self.all_ids)
-            or len(new_pair_clusters) < 5
+        use_previous_clusters = self.use_match_reuse and (
+            len(self.clusters) >= 1
+            and (
+                len(self.clusters[0].piece_ids) > 0.5 * len(self.all_ids)
+                or len(new_pair_clusters) < 5
+            )
         )
         if use_previous_clusters:
             print("RECYCLING OLD MATCHES")
@@ -440,6 +463,8 @@ class Clustering:
 
         if finetune_iters is None:
             finetune_iters = 5
+        if not self.use_icp:
+            finetune_iters = 0
 
         try:
             new_cluster = cluster1.merge(cluster2, finetune_iters=finetune_iters)
@@ -609,7 +634,7 @@ class Clustering:
                     continue
                 try:
                     cluster = trusted_cluster.merge(
-                        cluster, try_fix=True, finetune_iters=5
+                        cluster, try_fix=True, finetune_iters=5 if self.use_icp else 0
                     )
                 except Exception:
                     cluster = None
@@ -628,6 +653,12 @@ class Clustering:
     def update_trusted_clusters(
         self, clusters: list[Cluster], trust_function: Callable
     ) -> list[Cluster]:
+        # With trusted clusters disabled, self.trusted_clusters stays empty and
+        # every cluster is passed on as an ordinary one. All the other places
+        # that consume self.trusted_clusters degrade to no-ops on an empty list.
+        if not self.use_trusted_clusters:
+            return clusters
+
         other_clusters = []
         for cluster in clusters:
             used_trusted_clusters = []
@@ -712,9 +743,11 @@ class Clustering:
             worst_score = min([cluster.score for cluster in previous_cluster_list])
             probabilities = np.array(
                 [
-                    (cluster.score - worst_score) ** 4
-                    if cluster.piece_ids.intersection(cluster.piece_ids) == 1
-                    else (cluster.score - worst_score)
+                    (
+                        (cluster.score - worst_score) ** 4
+                        if cluster.piece_ids.intersection(cluster.piece_ids) == 1
+                        else (cluster.score - worst_score)
+                    )
                     for cluster in previous_cluster_list
                 ]
             )
