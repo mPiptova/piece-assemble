@@ -2,6 +2,12 @@
 
 This is a Python package for assembly of images broken into pieces (e.g. jigsaw puzzle).
 
+## Setup
+Requires Python 3.11 or later.
+
+```
+pip install -r requirements.txt
+```
 
 ## Usage
 Images needs to be already preprocessed prior to using this project.
