@@ -59,7 +59,7 @@ def test_call_zeroes_pairwise_icp_iterations_when_disabled(use_icp: bool) -> Non
         clustering(
             n_iters=1,
             trusted_cluster_config={},
-            cluster_config={},
+            cluster_config={"border_dist_tol": 4},
             icp_max_iters=100,
             icp_min_change=0.3,
             n_processes=1,
@@ -81,7 +81,7 @@ def run_once_with_seed(seed: int | None) -> tuple[float, float]:
         clustering(
             n_iters=1,
             trusted_cluster_config={},
-            cluster_config={},
+            cluster_config={"border_dist_tol": 4},
             icp_max_iters=10,
             icp_min_change=0.3,
             n_processes=1,

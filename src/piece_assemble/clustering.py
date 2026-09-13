@@ -15,6 +15,7 @@ from tqdm import tqdm
 from image import np_to_pil
 from piece_assemble.cluster import Cluster
 from piece_assemble.cycles import TransformationGraph
+from piece_assemble.neighbors import ComplexityNeighborClassifier
 
 if TYPE_CHECKING:
     from piece_assemble.cluster import ClusterScorer
@@ -131,6 +132,16 @@ class Clustering:
         use_match_reuse: bool = True,
         seed: int | None = None,
     ) -> Cluster | None:
+        # Building a Cluster needs a neighbor classifier, which a config read
+        # from file doesn't carry. CompactMatch.to_cluster adds one, but only
+        # once the first match is converted, which leaves anything constructing
+        # a cluster before that (the cycle search, when running serially)
+        # without it.
+        cluster_config.setdefault(
+            "neighbor_classifier",
+            ComplexityNeighborClassifier(cluster_config["border_dist_tol"]),
+        )
+
         self.cluster_config = cluster_config
         self.use_icp = use_icp
         self.use_trusted_clusters = use_trusted_clusters
