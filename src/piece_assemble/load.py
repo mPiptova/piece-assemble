@@ -53,7 +53,9 @@ def load_images(
     return img_ids, imgs, masks
 
 
-def load_pieces(path: str, feature_extractor: FeatureExtractor) -> dict[str, Piece]:
+def load_pieces(
+    path: str, feature_extractor: FeatureExtractor, scale: float = 1
+) -> dict[str, Piece]:
     """
     Load pieces from the given directory.
 
@@ -61,13 +63,15 @@ def load_pieces(path: str, feature_extractor: FeatureExtractor) -> dict[str, Pie
     ----------
     path
         Path to the directory containing piece images.
+    scale
+        All loaded piece images will be rescaled by this factor.
 
     Returns
     -------
     pieces
         A dictionary of Piece objects.
     """
-    img_ids, imgs, masks = load_images(path)
+    img_ids, imgs, masks = load_images(path, scale)
 
     return {
         img_ids[i]: Piece.from_image(
@@ -78,7 +82,7 @@ def load_pieces(path: str, feature_extractor: FeatureExtractor) -> dict[str, Pie
 
 
 def load_puzzle(
-    path: str, background_val: float = 1
+    path: str, background_val: float = 1, scale: float = 1
 ) -> tuple[dict[str, TransformedPiece], list[list[str]]]:
     """
     Load puzzle from the given directory.
@@ -90,6 +94,12 @@ def load_puzzle(
     ----------
     path
         Path to the directory containing puzzle pieces.
+    scale
+        All loaded piece images, as well as the ground truth transformations
+        read from `pieces.json`, are rescaled by this factor. This must match
+        the scale used when running the assembly pipeline being evaluated, or
+        predicted and ground truth transformations will live in different
+        coordinate spaces and every distance-based comparison will be wrong.
 
     Returns
     -------
@@ -98,16 +108,15 @@ def load_puzzle(
     neighbors
         A list of lists of neighbor piece names.
     """
-    pieces = load_pieces(path, DummyFeatureExtractor(background_val))
+    pieces = load_pieces(path, DummyFeatureExtractor(background_val), scale)
 
     with open(os.path.join(path, "pieces.json"), "r") as f:
         pieces_json = json.load(f)
 
-    transformed_pieces = {
-        p["id"]: TransformedPiece(
-            pieces[p["id"]], Transformation.from_dict(p["transformation"])
-        )
-        for p in pieces_json["transformed_pieces"]
-    }
+    transformed_pieces = {}
+    for p in pieces_json["transformed_pieces"]:
+        t = Transformation.from_dict(p["transformation"])
+        t = Transformation(t.rotation_angle, t.translation * scale)
+        transformed_pieces[p["id"]] = TransformedPiece(pieces[p["id"]], t)
 
     return transformed_pieces, pieces_json["neighbors"]
