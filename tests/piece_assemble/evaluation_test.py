@@ -1,9 +1,12 @@
+import numpy as np
 import pytest
 
 from geometry import Transformation
 from piece_assemble.evaluation import (
     _fixed_position_correct_piece_ratio,
+    cluster_dict_to_transformations,
     correct_piece_ratio,
+    evaluate,
 )
 
 
@@ -226,19 +229,69 @@ def test_correct_piece_ratio(
     translation_tol: float,
     expected_result: float,
 ) -> None:
-    assembled = {
-        "transformed_pieces": [
-            {"id": piece_id, "transformation": transformation}
-            for piece_id, transformation in pred_transformations.items()
-        ]
-    }
-    ground_truth = {
-        "transformed_pieces": [
-            {"id": piece_id, "transformation": transformation}
-            for piece_id, transformation in true_transformations.items()
-        ]
-    }
+    assembled = cluster_dict_to_transformations(
+        {
+            "transformed_pieces": [
+                {"id": piece_id, "transformation": transformation}
+                for piece_id, transformation in pred_transformations.items()
+            ]
+        }
+    )
+    ground_truth = cluster_dict_to_transformations(
+        {
+            "transformed_pieces": [
+                {"id": piece_id, "transformation": transformation}
+                for piece_id, transformation in true_transformations.items()
+            ]
+        }
+    )
 
     assert correct_piece_ratio(
         assembled, ground_truth, angle_tol, translation_tol
     ) == pytest.approx(expected_result, 0.01)
+
+
+GROUND_TRUTH = {
+    "0": Transformation(0, np.array([0, 0])),
+    "1": Transformation(0, np.array([10, 0])),
+    "2": Transformation(0, np.array([20, 0])),
+}
+NEIGHBORS = [("0", "1"), ("1", "2")]
+
+
+def test_evaluate_perfect_assembly() -> None:
+    predicted = [dict(GROUND_TRUTH)]
+
+    result = evaluate(predicted, GROUND_TRUTH, NEIGHBORS, rotation_tol=0.1, translation_tol=1)
+
+    assert result["largest_cluster_ratio"] == 1
+    assert result["num_of_clusters"] == 1
+    assert result["angle_error"] == pytest.approx(0)
+    assert result["translation_error"] == pytest.approx(0)
+
+
+def test_evaluate_partial_assembly() -> None:
+    # Pieces "0" and "1" are correctly assembled relative to each other, "2" is
+    # left in its own, unrelated position.
+    predicted = [
+        {
+            "0": Transformation(0, np.array([100, 100])),
+            "1": Transformation(0, np.array([110, 100])),
+            "2": Transformation(1, np.array([0, 0])),
+        }
+    ]
+
+    result = evaluate(predicted, GROUND_TRUTH, NEIGHBORS, rotation_tol=0.1, translation_tol=1)
+
+    # Largest correct cluster is {"0", "1"}: 2 out of 3 pieces.
+    assert result["largest_cluster_ratio"] == pytest.approx(2 / 3)
+    # One correct cluster ({"0", "1"}) plus one leftover piece ("2").
+    assert result["num_of_clusters"] == 2
+
+
+def test_evaluate_empty_prediction() -> None:
+    result = evaluate([], GROUND_TRUTH, NEIGHBORS, rotation_tol=0.1, translation_tol=1)
+
+    # Nothing assembled: every piece counts as its own singleton cluster.
+    assert result["largest_cluster_ratio"] == pytest.approx(1 / 3)
+    assert result["num_of_clusters"] == 3

@@ -1,9 +1,53 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from geometry import Transformation
+from piece_assemble.metrics import RotationAngleError, TransformationError, TranslationError
+
+if TYPE_CHECKING:
+    PieceTransformations = dict[str, Transformation]
+    from piece_assemble.cluster import Cluster
+
+
+def cluster_to_transformations(cluster: Cluster) -> PieceTransformations:
+    """Extract the transformation of every piece in a cluster."""
+    return {piece.name: piece.transformation for piece in cluster.pieces.values()}
+
+
+def cluster_dict_to_transformations(cluster_dict: dict) -> PieceTransformations:
+    """Converts a cluster dictionary to a dictionary of transformations.
+
+    Parameters
+    ----------
+    cluster_dict
+        Dictionary containing the definition of a cluster
+
+    Returns
+    -------
+    piece_transformations
+        Dictionary mapping piece ids to transformations
+    """
+    return {
+        piece_dict["id"]: Transformation.from_dict(piece_dict["transformation"])
+        for piece_dict in cluster_dict["transformed_pieces"]
+    }
+
+
+def get_relative_transformation(
+    transformation1: Transformation, transformation2: Transformation
+) -> Transformation:
+    """Get relative arrangement of two transformations.
+
+    Computes what transformation should be applied to `transformation2`
+    to get `transformation1`.
+    """
+    return transformation1.compose(transformation2.inverse())
 
 
 def _fixed_position_correct_piece_ratio(
-    pred_transformations: dict,
-    true_transformations: dict,
+    predicted: PieceTransformations,
+    ground_truth: PieceTransformations,
     angle_tol: float,
     translation_tol: float,
 ) -> float:
@@ -18,9 +62,9 @@ def _fixed_position_correct_piece_ratio(
 
     Parameters
     ----------
-    pred_transformations
+    predicted
         The predicted transformations.
-    true_transformations
+    ground_truth
         The true transformations.
     angle_tol
         The maximum angle difference between the two transformations.
@@ -34,14 +78,14 @@ def _fixed_position_correct_piece_ratio(
     """
 
     # Corner cases
-    if len(true_transformations) == 0:
+    if len(ground_truth) == 0:
         return 1
-    if len(pred_transformations) == 0:
+    if len(predicted) == 0:
         return 0
 
     correct_number = 0
-    for piece_id, true_transformation in true_transformations.items():
-        pred_transformation = pred_transformations.get(piece_id, None)
+    for piece_id, true_transformation in ground_truth.items():
+        pred_transformation = predicted.get(piece_id, None)
         if pred_transformation is None:
             continue
         if pred_transformation.is_close(
@@ -49,23 +93,59 @@ def _fixed_position_correct_piece_ratio(
         ):
             correct_number += 1
 
-    return correct_number / len(true_transformations)
+    return correct_number / len(ground_truth)
+
+
+def unify_transformations(
+    predicted: PieceTransformations, ground_truth: PieceTransformations, key: str
+) -> PieceTransformations | None:
+    """Transform the predicted pieces to match the transformation of given piece.
+
+    Parameters
+    ----------
+    predicted
+        Representation of the predicted pieces transformations.
+    ground_truth
+        Representation of the ground truth pieces transformations.
+    key
+        The piece whose transformation will be used to unify the transformations.
+
+    Returns
+    -------
+    unified_transformations
+        Predicted transformations rotated and translated in such a way that the
+        transformation of piece `key` is the same as the ground truth. Other pieces
+        are transformed correspondingly. `None` if `key` is missing from either
+        assembly.
+    """
+    true_t = ground_truth.get(key, None)
+    pred_t = predicted.get(key, None)
+    if pred_t is None or true_t is None:
+        return None
+
+    unifying_transformation = pred_t.inverse().compose(true_t)
+
+    return {
+        piece_id: t.compose(unifying_transformation)
+        for piece_id, t in predicted.items()
+    }
 
 
 def correct_piece_ratio(
-    assembled: dict, ground_truth: dict, angle_tol: float, translation_tol: float
+    predicted: PieceTransformations,
+    ground_truth: PieceTransformations,
+    angle_tol: float,
+    translation_tol: float,
 ) -> float:
     """
     Calculate the ratio of correctly transformed pieces, given two assemblies.
 
     Parameters
     ----------
-    assembled
-        The assembled pieces, as a dictionary with the following keys:
-            - transformed_pieces: a list of dictionaries, each containing the keys 'id'
-            and 'transformation'
+    predicted
+        Representation of the predicted pieces transformations.
     ground_truth
-        The ground truth pieces, as a dictionary with the same structure as `assembled`
+        Representation of the ground truth pieces transformations.
     angle_tol
         The maximum angle difference between the predicted and ground truth
         transformations for them to be considered the same
@@ -78,37 +158,222 @@ def correct_piece_ratio(
     ratio
         The ratio of correctly transformed pieces
     """
-    true_transformations = {
-        piece["id"]: Transformation.from_dict(piece["transformation"])
-        for piece in ground_truth["transformed_pieces"]
-    }
-
-    pred_transformations = {
-        piece["id"]: Transformation.from_dict(piece["transformation"])
-        for piece in assembled["transformed_pieces"]
-    }
-
-    max_ratio = 0
-    for piece_id in true_transformations.keys():
-        true_t = true_transformations.get(piece_id, None)
-        pred_t = pred_transformations.get(piece_id, None)
-        if pred_t is None or true_t is None:
+    max_ratio = 0.0
+    for piece_id in ground_truth.keys():
+        unified_pred = unify_transformations(predicted, ground_truth, piece_id)
+        if unified_pred is None:
             continue
 
-        true_t = true_t.inverse()
-        pred_t = pred_t.inverse()
-
-        normalized_true = {
-            piece_id: t.compose(true_t) for piece_id, t in true_transformations.items()
-        }
-        normalized_pred = {
-            piece_id: t.compose(pred_t) for piece_id, t in pred_transformations.items()
-        }
-
         ratio = _fixed_position_correct_piece_ratio(
-            normalized_pred, normalized_true, angle_tol, translation_tol
+            unified_pred, ground_truth, angle_tol, translation_tol
         )
         if ratio > max_ratio:
             max_ratio = ratio
 
     return max_ratio
+
+
+def _merge_overlapping_clusters(clusters: list[set[str]]) -> list[set[str]]:
+    something_changed = True
+    while something_changed:
+        something_changed = False
+        for i, cluster in enumerate(clusters):
+            for j in range(i + 1, len(clusters)):
+                other_cluster = clusters[j]
+                if cluster.intersection(other_cluster):
+                    clusters.pop(j)
+                    clusters.pop(i)
+                    clusters.append(cluster.union(other_cluster))
+                    something_changed = True
+                    break
+            if something_changed:
+                break
+    return clusters
+
+
+def _get_correct_clusters(
+    assembled: PieceTransformations,
+    ground_truth: PieceTransformations,
+    angle_tol: float,
+    translation_tol: float,
+) -> list[set[str]]:
+    """Find maximal subsets of `assembled` whose relative placement matches
+    `ground_truth`, for every possible choice of reference piece."""
+    if len(assembled) == 0:
+        return []
+
+    clusters: list[set[str]] = []
+
+    for piece_id in assembled.keys():
+        unified_pred = unify_transformations(assembled, ground_truth, piece_id)
+        if unified_pred is None:
+            continue
+        clusters.append(
+            {
+                p_id
+                for p_id in unified_pred.keys()
+                if unified_pred[p_id].is_close(
+                    ground_truth[p_id], angle_tol, translation_tol
+                )
+            }
+        )
+        clusters = _merge_overlapping_clusters(clusters)
+
+    return clusters
+
+
+def get_correctly_predicted_clusters(
+    predicted: list[PieceTransformations],
+    ground_truth: PieceTransformations,
+    angle_tol: float,
+    translation_tol: float,
+) -> list[PieceTransformations]:
+    """Find the largest correctly-assembled cluster each ground truth piece belongs
+    to, across all candidate clusters in `predicted`, then deduplicate so every
+    piece is accounted for by exactly one (non-overlapping) cluster.
+
+    Every piece starts out as its own trivially "correct" singleton cluster, so the
+    result always covers every piece in `ground_truth`, even when `predicted` is
+    empty or contains no correct matches at all.
+    """
+    largest_cluster_per_piece = {
+        id: {id: Transformation.identity()} for id in ground_truth.keys()
+    }
+    for pred_cluster in predicted:
+        correct_clusters_pieces = _get_correct_clusters(
+            pred_cluster, ground_truth, angle_tol, translation_tol
+        )
+        correct_clusters = [
+            {piece_id: pred_cluster[piece_id] for piece_id in cluster_pieces}
+            for cluster_pieces in correct_clusters_pieces
+        ]
+        for cluster in correct_clusters:
+            for piece_id in cluster.keys():
+                if len(largest_cluster_per_piece[piece_id]) < len(cluster):
+                    largest_cluster_per_piece[piece_id] = cluster.copy()
+
+    largest_clusters = sorted(
+        largest_cluster_per_piece.values(),
+        key=len,
+        reverse=True,
+    )
+
+    unique_clusters = []
+    while len(largest_clusters) > 0:
+        new_unique_cluster = largest_clusters.pop(0)
+        unique_clusters.append(new_unique_cluster)
+        for c in largest_clusters:
+            for key in new_unique_cluster.keys():
+                c.pop(key, None)
+
+        largest_clusters = [cluster for cluster in largest_clusters if len(cluster) > 0]
+
+    return unique_clusters
+
+
+def registration_error(
+    predicted: PieceTransformations,
+    ground_truth: PieceTransformations,
+    neighbors: list[tuple[str, str]],
+    angle_tol: float,
+    translation_tol: float,
+) -> dict[str, list[float | None]]:
+    """Compute per-neighbor-pair registration errors (angle, translation, and a
+    combined normalized error) for the neighboring pieces that both appear in
+    `predicted`."""
+    applicable_neighbors = [
+        neighbor
+        for neighbor in neighbors
+        if neighbor[0] in predicted and neighbor[1] in predicted
+    ]
+    pred_transformations = [
+        get_relative_transformation(predicted[neighbor[0]], predicted[neighbor[1]])
+        for neighbor in applicable_neighbors
+    ]
+    true_transformations = [
+        get_relative_transformation(
+            ground_truth[neighbor[0]], ground_truth[neighbor[1]]
+        )
+        for neighbor in applicable_neighbors
+    ]
+
+    metric_functions = {
+        "angle_error": RotationAngleError(),
+        "translation_error": TranslationError(),
+        "transformation_error": TransformationError(
+            angle_tol=angle_tol, translation_tol=translation_tol
+        ),
+    }
+
+    return {
+        key: [
+            function(pred, true)
+            for pred, true in zip(pred_transformations, true_transformations)
+        ]
+        for key, function in metric_functions.items()
+    }
+
+
+def evaluate(
+    predicted: list[PieceTransformations],
+    ground_truth: PieceTransformations,
+    gt_neighbors: list[tuple[str, str]],
+    rotation_tol: float,
+    translation_tol: float,
+) -> dict[str, float]:
+    """Evaluate a predicted assembly (given as a list of candidate clusters,
+    e.g. partial solutions when the assembly did not fully succeed) against the
+    ground truth.
+
+    Returns
+    -------
+    A dictionary with:
+        - ``angle_error``, ``translation_error``, ``transformation_error``:
+          mean registration error over all correctly-assembled neighboring pairs.
+        - ``largest_cluster_ratio``: fraction of pieces contained in the largest
+          correctly-assembled cluster.
+        - ``num_of_clusters``: number of distinct clusters (correct clusters plus
+          leftover unplaced/incorrect pieces counted individually) the ground
+          truth pieces end up split across.
+    """
+    correctly_pred_clusters = get_correctly_predicted_clusters(
+        predicted, ground_truth, rotation_tol, translation_tol
+    )
+
+    correctly_pred_pieces: set[str] = set()
+    for cluster in correctly_pred_clusters:
+        correctly_pred_pieces |= cluster.keys()
+    num_of_clusters = len(correctly_pred_clusters) + len(
+        ground_truth.keys() - correctly_pred_pieces
+    )
+
+    cluster_sizes = [len(cluster) for cluster in correctly_pred_clusters]
+    largest_cluster_size = max(cluster_sizes) if cluster_sizes else 0
+    ratio = (
+        largest_cluster_size / len(ground_truth.keys()) if ground_truth else 1.0
+    )
+
+    registration_results_lists: dict[str, list[float | None]] = {
+        "angle_error": [],
+        "translation_error": [],
+        "transformation_error": [],
+    }
+
+    for cluster in correctly_pred_clusters:
+        cluster_registration_results = registration_error(
+            cluster, ground_truth, gt_neighbors, rotation_tol, translation_tol
+        )
+        for key, values in cluster_registration_results.items():
+            registration_results_lists[key].extend(values)
+
+    evaluation_results = {}
+    for key, values in registration_results_lists.items():
+        valid_values = [value for value in values if value is not None]
+        evaluation_results[key] = (
+            sum(valid_values) / len(valid_values) if valid_values else 0
+        )
+
+    evaluation_results["largest_cluster_ratio"] = ratio
+    evaluation_results["num_of_clusters"] = num_of_clusters
+
+    return evaluation_results
