@@ -262,7 +262,9 @@ NEIGHBORS = [("0", "1"), ("1", "2")]
 def test_evaluate_perfect_assembly() -> None:
     predicted = [dict(GROUND_TRUTH)]
 
-    result = evaluate(predicted, GROUND_TRUTH, NEIGHBORS, rotation_tol=0.1, translation_tol=1)
+    result = evaluate(
+        predicted, GROUND_TRUTH, NEIGHBORS, rotation_tol=0.1, translation_tol=1
+    )
 
     assert result["largest_cluster_ratio"] == 1
     assert result["num_of_clusters"] == 1
@@ -281,7 +283,9 @@ def test_evaluate_partial_assembly() -> None:
         }
     ]
 
-    result = evaluate(predicted, GROUND_TRUTH, NEIGHBORS, rotation_tol=0.1, translation_tol=1)
+    result = evaluate(
+        predicted, GROUND_TRUTH, NEIGHBORS, rotation_tol=0.1, translation_tol=1
+    )
 
     # Largest correct cluster is {"0", "1"}: 2 out of 3 pieces.
     assert result["largest_cluster_ratio"] == pytest.approx(2 / 3)

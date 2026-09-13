@@ -1,4 +1,4 @@
-""" Script for running the clustering algorithm.
+"""Script for running the clustering algorithm.
 
 Example
 --------
@@ -66,7 +66,7 @@ def run_prediction(config: dict) -> list[Cluster]:
         trusted_cluster_config=config["trusted_cluster"],
     )
 
-    return clustering.clusters
+    return clustering.clusters  # type: ignore
 
 
 if __name__ == "__main__":

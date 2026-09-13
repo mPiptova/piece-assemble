@@ -13,8 +13,7 @@ class Metric:
     @abstractmethod
     def __call__(
         self, pred: Transformation | None, gold: Transformation | None
-    ) -> float | None:
-        ...
+    ) -> float | None: ...
 
 
 class RotationAngleError(Metric):

@@ -3,10 +3,19 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from geometry import Transformation
-from piece_assemble.metrics import RotationAngleError, TransformationError, TranslationError
+from piece_assemble.metrics import (
+    RotationAngleError,
+    TransformationError,
+    TranslationError,
+)
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     PieceTransformations = dict[str, Transformation]
+    # load_puzzle reads neighbor pairs back from JSON, so they come in as
+    # plain lists rather than tuples.
+    Neighbors = Sequence[Sequence[str]]
     from piece_assemble.cluster import Cluster
 
 
@@ -274,7 +283,7 @@ def get_correctly_predicted_clusters(
 def registration_error(
     predicted: PieceTransformations,
     ground_truth: PieceTransformations,
-    neighbors: list[tuple[str, str]],
+    neighbors: Neighbors,
     angle_tol: float,
     translation_tol: float,
 ) -> dict[str, list[float | None]]:
@@ -317,7 +326,7 @@ def registration_error(
 def evaluate(
     predicted: list[PieceTransformations],
     ground_truth: PieceTransformations,
-    gt_neighbors: list[tuple[str, str]],
+    gt_neighbors: Neighbors,
     rotation_tol: float,
     translation_tol: float,
 ) -> dict[str, float]:
@@ -349,9 +358,7 @@ def evaluate(
 
     cluster_sizes = [len(cluster) for cluster in correctly_pred_clusters]
     largest_cluster_size = max(cluster_sizes) if cluster_sizes else 0
-    ratio = (
-        largest_cluster_size / len(ground_truth.keys()) if ground_truth else 1.0
-    )
+    ratio = largest_cluster_size / len(ground_truth.keys()) if ground_truth else 1.0
 
     registration_results_lists: dict[str, list[float | None]] = {
         "angle_error": [],
