@@ -233,7 +233,9 @@ def fit_transform(
 
         model, _ = ransac((points1, points2), EuclideanTransform, 2, 5)
 
-        if not np.isnan(model.rotation):
+        # ransac returns None when it finds no inliers at all; fall back to the
+        # least squares fit below in that case.
+        if model is not None and not np.isnan(model.rotation):
             return Transformation(-model.rotation, model.translation)
 
     x = np.linalg.lstsq(a, b, rcond=None)[0]
