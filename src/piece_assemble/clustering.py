@@ -129,11 +129,19 @@ class Clustering:
         use_icp: bool = True,
         use_trusted_clusters: bool = True,
         use_match_reuse: bool = True,
+        seed: int | None = None,
     ) -> Cluster | None:
         self.cluster_config = cluster_config
         self.use_icp = use_icp
         self.use_trusted_clusters = use_trusted_clusters
         self.use_match_reuse = use_match_reuse
+
+        # The search draws on two independent sources of randomness: this
+        # instance's own Random, and numpy's global one. Both have to be seeded
+        # to make a run repeatable.
+        if seed is not None:
+            self.random.seed(seed)
+            np.random.seed(seed)
 
         # ICP is applied in two places: refining each candidate pairwise match,
         # and refining piece placement after a cluster merge. Disabling it has
