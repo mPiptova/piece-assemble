@@ -33,7 +33,7 @@ if __name__ == "__main__":
 
     with Pool(config["clustering"]["n_processes"]) as p:
         pieces = p.starmap(
-            Piece,
+            Piece.from_image,
             zip(
                 img_ids,
                 imgs,
