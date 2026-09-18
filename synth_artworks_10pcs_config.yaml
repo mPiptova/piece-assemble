@@ -1,0 +1,75 @@
+# Configuration tuned for the synth_artworks 10-piece dataset (see
+# docs/evaluation-results.md for how it was derived and what it does to the
+# results). Only clustering.min_complexity differs from sample_config.yaml's
+# owl_101pcs-tuned defaults.
+#
+# img_path below is a placeholder; point it at any synth_artworks-style puzzle
+# directory (piece images/masks plus a pieces.json ground truth) before use.
+img_path: ""
+
+# Logging settings, optional.
+logging:
+  output_images_path: "./output/puzzle"
+  store_new_matches: True
+  store_old_matches: True
+  store_trusted_clusters: True
+
+# Defines the parameters of the piece representation
+piece:
+  # Polygon approximation precision
+  # Smaller values mean more precise approximation, but large number of points
+  polygon_approximation_tolerance: 3
+  # sigma for Gaussian blur used for color features extraction
+  sigma: 4
+  # Scale of the images. Smaller scale means faster but less precise computation.
+  scale: 1
+
+descriptor:
+  # Minimum length of a line segment, smaller segments will be deleted
+  min_segment_len: 0
+  # Number of points used for the spatial descriptor for each segment
+  n_points: 5
+  # Number of points used for the color descriptor for each segment
+  n_colors: 7
+  # Weights for distance computation
+  spatial_dist_w: 1
+  color_dist_w: 11
+  color_var_w: 0
+  length_w: 110
+  rel_len_diff_w: 5
+  angle_w: 0
+  # Tolerances for osculating circle approximation
+  tol_dists: [2, 3]
+
+cluster:
+  border_dist_tol: 4
+  self_intersection_tol: 0.02
+  rotation_tol: 0.17
+  translation_tol: 30
+
+cluster_scorer:
+  w_convexity: 2
+  w_complexity: 2
+  w_color_dist: 1000
+  w_dist: 50
+  w_border_length: 0.1
+
+trusted_cluster:
+  complexity_threshold: 4
+  color_threshold: 0.01
+  dist_threshold: 1.15
+
+clustering:
+  n_new_matches: 10
+  # sample_config.yaml's default of [2, 0.5] was tuned on owl_101pcs, whose
+  # pieces have curvier, higher-winding-angle borders than these synthetic
+  # cuts. At that threshold, most legitimate pairwise matches on this dataset
+  # never clear the complexity floor and are discarded outright before the
+  # global assembly stage ever sees them - see docs/evaluation-results.md for
+  # the measurements this is based on.
+  min_complexity: [0, 0]
+  n_iters: 20
+  icp_max_iters: 100
+  icp_min_change: 0.3
+  n_processes: 4
+  n_used_matches: 40000

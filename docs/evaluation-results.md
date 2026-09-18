@@ -8,6 +8,101 @@ config, the dataset and the commit, all of which are recorded per block.
 
 ---
 
+## 2026-09-18 — config tuning on 10-piece synthetic puzzles
+
+**Purpose.** The 2026-09-13 pilot's baseline coverage was poor (mean
+`largest_cluster_ratio` 0.25, zero of six puzzles fully solved). Rather than
+accept that as the method's ceiling, this run tunes `sample_config.yaml`'s
+defaults — which were set for `owl_101pcs` — against this dataset, using the
+same 6-puzzle set from the pilot as the tuning target, then checks the result
+generalises on 15 fresh, disjoint puzzles.
+
+### Setup
+
+| | |
+|---|---|
+| Commit | `66deac0` |
+| Tuning set | the same 6 puzzles as the 2026-09-13 pilot |
+| Held-out set | 15 further `synth_artworks/test` 10-piece puzzles, disjoint from tuning |
+| Config | `sample_config.yaml` values, `scale: 1`, `n_iters: 20`, `n_processes: 4`, as in the pilot |
+
+### Finding the fix
+
+All 16 ground-truth-adjacent piece pairs on a representative tuning puzzle
+were confirmed present among *verified* pairwise matches — so the shape/colour
+matching stage was never the problem. A one-factor-at-a-time sweep over the
+remaining clustering parameters (`self_intersection_tol`, `translation_tol`,
+`rotation_tol`, `n_new_matches`, the trusted-cluster thresholds,
+`min_complexity`) on one tuning puzzle found exactly one factor that mattered:
+`clustering.min_complexity`, from the default `[2, 0.5]` to `[0, 0]`, took that
+puzzle from 3/10 pieces assembled to a full 10/10.
+
+`min_complexity` gates a candidate pairwise match by
+`border_complexity = num_segments × winding_angle` of its shared contour — the
+default floor was tuned on `owl_101pcs`, whose puzzle-style pieces have
+curvier, higher-winding-angle borders than these synthetic straight-edge cuts.
+At the default threshold, most legitimate matches on this dataset never clear
+the floor and are discarded before the global assembly stage ever sees them —
+not a matching failure, a filtering one.
+
+Confirmed across 3 different tuning puzzles × 2 seeds (6/6): `min_complexity:
+[0, 0]` fully solved every one, versus 0/6 at the default. A milder
+`[0.3, 0.1]` also helped but less reliably (9–10/10 pieces, not consistently
+full).
+
+### Results: tuned vs. baseline, on the tuning set and the held-out set
+
+Both configs otherwise identical; only `clustering.min_complexity` differs
+(`[2, 0.5]` baseline vs. `[0, 0]` tuned — see
+`synth_artworks_10pcs_config.yaml`). 2 repeats per puzzle, `n_processes: 4`
+(not reproducibility-pinned — see the note in the previous entry).
+
+| | largest_cluster_ratio | num_of_clusters | translation_error | angle_error | runtime (s) |
+|---|---|---|---|---|---|
+| Tuning set, baseline (n=12) | 0.254 ± 0.130 | 7.17 ± 1.95 | 1.220 ± 0.652 | 0.0005 ± 0.0004 | 19.6 ± 8.0 |
+| Tuning set, tuned (n=12) | **0.660 ± 0.224** | **4.08 ± 2.23** | 3.458 ± 1.965 | 0.0019 ± 0.0017 | 10.8 ± 1.9 |
+| Held-out set, baseline (n=30) | 0.240 ± 0.181 | 7.87 ± 2.06 | 1.282 ± 1.138 | 0.0007 ± 0.0012 | 16.3 ± 3.3 |
+| Held-out set, tuned (n=30) | **0.607 ± 0.193** | **4.07 ± 1.57** | 4.244 ± 2.881 | 0.0025 ± 0.0038 | 12.9 ± 6.7 |
+
+The held-out improvement (0.24 → 0.61) closely tracks the tuning set (0.25 →
+0.66), so this is not an artefact of fitting the 6 tuning puzzles. More
+tellingly: the tuned config's coverage ratio was **at or above the baseline's
+on every single one of the 15 held-out puzzles**, with no exceptions —
+per-puzzle numbers are in `heldout_baseline_runs.csv` /
+`heldout_tuned_runs.csv`. One held-out puzzle was fully solved
+(`largest_cluster_ratio` = 1.0) in at least one run under the tuned config;
+none were under baseline.
+
+**The honest tradeoff.** Registration error among pairs the metric already
+classifies as "correctly assembled" is roughly 3× worse under the tuned
+config (translation error 1.2 → 4.2 on the held-out set). This is not the
+tuned config placing pieces *wrong* — `correctness` is itself defined by
+`rotation_tol`/`translation_tol` (0.17 rad / 30 px), and 4.2 px mean error is
+still deep inside that 30 px tolerance. It does mean the tuned config's
+correct placements sit less tightly than the baseline's rare correct
+placements did. Given the baseline solved zero puzzles at all, a looser-but-
+far-more-complete assembly is the right tradeoff here, but it should be
+reported as a tradeoff, not silently.
+
+### Caveats
+
+- Tuning and evaluation both used `n_processes: 4` without pinning
+  `PYTHONHASHSEED`, so exact numbers will vary on rerun (see the
+  reproducibility section below); the *comparison* between configs is the
+  robust part, not any individual number.
+- Only `min_complexity` was tuned. The OFAT sweep only tested one factor at a
+  time on one puzzle — a fuller joint search, or tuning on more of the other
+  parameters, might do better still.
+- This was tuned and evaluated only on 10-piece puzzles. Whether
+  `min_complexity: [0, 0]` also helps (or over-triggers false merges on) larger
+  or noisier puzzles — the 101-piece jigsaw, the real damaged negative — is
+  untested.
+
+The tuned config is committed as `synth_artworks_10pcs_config.yaml` at the
+repo root.
+
+---
+
 ## 2026-09-13 — ablation pilot on 10-piece synthetic puzzles
 
 **Purpose.** First use of the evaluation harness on real ground-truth data: check
