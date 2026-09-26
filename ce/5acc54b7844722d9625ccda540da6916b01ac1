@@ -1,0 +1,31 @@
+src/piece_assemble/tools/eval_assembly.py
+  s_71901ced23b634::t_122d7b56252036 55-59,61-77,85,89-90,99-102,106-108,125-142,147-154
+  s_71901ced23b634::t_e0ecf4f978ca97 4-9,11-13
+tests/piece_assemble/evaluation_test.py
+  s_71901ced23b634::t_bfa6b63e2206cf 305-396
+  s_71901ced23b634::t_2d6a1ef7212593 1-2,12
+src/piece_assemble/tools/run_assembly.py
+  s_71901ced23b634::t_39aa8a6a0d557b 26,29-36,45-49,68-85
+  s_71901ced23b634::t_e76dfeb958f5cb 86
+src/piece_assemble/evaluation.py
+  s_71901ced23b634::t_8efb4962dffa9b 96
+  s_71901ced23b634::t_ffeff454eae264 20-21
+  s_71901ced23b634::t_e008acfe396791 59-95,97-123,129-139
+  s_71901ced23b634::t_4ad5225936aee3 124-128
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ce5acc54b7844722d9625ccda540da6916b01ac1",
+  "prompts": {},
+  "sessions": {
+    "s_71901ced23b634": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "136c1b26-48f0-450d-8081-fdd90ffb5bb8",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Marcela Brichtova Piptova <marcela.brichtova.piptova@rossum.ai>"
+    }
+  }
+}
