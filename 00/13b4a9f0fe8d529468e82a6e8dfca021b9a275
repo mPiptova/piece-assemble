@@ -1,0 +1,21 @@
+docs/evaluation-results.md
+  s_71901ced23b634::t_b304dda36c7600 13-15
+  s_71901ced23b634::t_7e1663e5c7b88f 11-12,16-125,130-191
+  s_71901ced23b634::t_fe154b5d5963d0 126-129
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0013b4a9f0fe8d529468e82a6e8dfca021b9a275",
+  "prompts": {},
+  "sessions": {
+    "s_71901ced23b634": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "136c1b26-48f0-450d-8081-fdd90ffb5bb8",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Marcela Brichtova Piptova <marcela.brichtova.piptova@rossum.ai>"
+    }
+  }
+}
