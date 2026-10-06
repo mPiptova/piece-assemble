@@ -1,0 +1,35 @@
+src/piece_assemble/clustering.py
+  s_71901ced23b634::t_a1a38a894a2254 263-264
+  s_71901ced23b634::t_7354d07c0dbe0b 233
+  s_71901ced23b634::t_b69320af268f73 138
+  s_71901ced23b634::t_13620576f79776 74
+  s_71901ced23b634::t_858ddfa7a06bfc 161
+  s_71901ced23b634::t_d1e21bbdc891e4 894
+  s_71901ced23b634::t_8d107207c276b6 906-907
+tests/piece_assemble/evaluation_test.py
+  s_71901ced23b634::t_bee8bcb4c4c66c 422-464
+src/piece_assemble/tools/eval_assembly.py
+  s_71901ced23b634::t_0355ad785f0179 142
+src/piece_assemble/evaluation.py
+  s_71901ced23b634::t_3d8037b3601b9f 68
+  s_71901ced23b634::t_19388a49630c26 118-119
+  s_71901ced23b634::t_11b3ae275f64fb 102-105
+tests/piece_assemble/clustering_test.py
+  s_71901ced23b634::t_c21e39fc860e36 251-347
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "10d7443b6b66e531e0099af6b2fa9e9a64accad9",
+  "prompts": {},
+  "sessions": {
+    "s_71901ced23b634": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "136c1b26-48f0-450d-8081-fdd90ffb5bb8",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Marcela Brichtova Piptova <marcela.brichtova.piptova@rossum.ai>"
+    }
+  }
+}
