@@ -1,0 +1,39 @@
+tests/piece_assemble/evaluation_test.py
+  s_71901ced23b634::t_797621c8117ac8 396-421
+tests/piece_assemble/clustering_test.py
+  s_71901ced23b634::t_b47e21be9d2915 137,140
+  s_71901ced23b634::t_25139b8ce3efb4 127-136,138-139,141-147
+  s_71901ced23b634::t_4f9f4c4404bcf0 6
+  s_71901ced23b634::t_d25269fc7eff17 75-98
+  s_71901ced23b634::t_f147d28d045682 99-101,104-126
+  s_71901ced23b634::t_8bc58160cc857e 102-103
+src/piece_assemble/tools/eval_assembly.py
+  s_71901ced23b634::t_6f8c8220405867 141
+src/piece_assemble/evaluation.py
+  s_71901ced23b634::t_1fe37bc5061bd2 99
+  s_71901ced23b634::t_01318df91f624f 117
+  s_71901ced23b634::t_630e64574830ac 67
+  s_71901ced23b634::t_37232cada59708 100
+src/piece_assemble/clustering.py
+  s_71901ced23b634::t_ac33334c19be98 134,151-155
+  s_71901ced23b634::t_1c4bc4ded2cdd0 225
+  s_71901ced23b634::t_d1321fde822ea4 871,879
+  s_71901ced23b634::t_90191ad52b70f9 258
+  s_71901ced23b634::t_4f57ca005d10a9 72
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a37514ba9831046e6c30bd06a73e579856ca3592",
+  "prompts": {},
+  "sessions": {
+    "s_71901ced23b634": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "136c1b26-48f0-450d-8081-fdd90ffb5bb8",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": null
+    }
+  }
+}
