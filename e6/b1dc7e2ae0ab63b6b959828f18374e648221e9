@@ -1,0 +1,21 @@
+docs/evaluation-results.md
+  s_71901ced23b634::t_c9080facd7063a 53-83
+synth_artworks_30pcs_config.yaml
+  s_71901ced23b634::t_da91665a096e61 1-80
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e6b1dc7e2ae0ab63b6b959828f18374e648221e9",
+  "prompts": {},
+  "sessions": {
+    "s_71901ced23b634": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "136c1b26-48f0-450d-8081-fdd90ffb5bb8",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Marcela Brichtova Piptova <marcela.brichtova.piptova@rossum.ai>"
+    }
+  }
+}
