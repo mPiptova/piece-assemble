@@ -1,0 +1,31 @@
+synth_white_50pcs_config.yaml
+  s_71901ced23b634::t_843a9c3ba29e68 65-70
+  s_71901ced23b634::t_afc22860dfb018 2-6
+synth_grayscale_50pcs_config.yaml
+  s_71901ced23b634::t_0a2f373af8546c 65-70
+  s_71901ced23b634::t_118175c551ac30 2-6
+sample_config.yaml
+  s_71901ced23b634::t_ea1fc98dcd34f0 58-65
+synth_color_50pcs_config.yaml
+  s_71901ced23b634::t_d0d6acc6624629 2-6
+  s_71901ced23b634::t_95ae8c24ae166a 72-76
+  s_71901ced23b634::t_ba7b82729302c2 77-79
+  s_71901ced23b634::t_cf46c4ffcce604 51-53
+  s_71901ced23b634::t_343dbef0e581ba 30-36
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0929c9d43af3a6b508cbc42cb47f969b70516380",
+  "prompts": {},
+  "sessions": {
+    "s_71901ced23b634": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "136c1b26-48f0-450d-8081-fdd90ffb5bb8",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Marcela Brichtova Piptova <marcela.brichtova.piptova@rossum.ai>"
+    }
+  }
+}
