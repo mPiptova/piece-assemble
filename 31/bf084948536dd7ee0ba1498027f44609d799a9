@@ -1,0 +1,63 @@
+src/piece_assemble/clustering.py
+  s_71901ced23b634::t_90ed0b27db3baf 181
+  s_71901ced23b634::t_5c0a0798ddbeb6 506-508,511,516-521,523,526-537
+  s_71901ced23b634::t_758162bc66e3c3 855-858,860
+  s_71901ced23b634::t_40f6e86530b9d8 618-622
+  s_71901ced23b634::t_e2a0292abaa254 703-711
+  s_71901ced23b634::t_af819b1cafa7cb 94
+  s_71901ced23b634::t_0574b6d1909b07 661
+  s_71901ced23b634::t_101fba9098060e 590-595
+  s_71901ced23b634::t_3ce61c64632e47 988-989,997
+  s_71901ced23b634::t_e9a4974e5f4cee 613
+  s_71901ced23b634::t_66ff1608f63b0d 454-456,463-466,476-479
+  s_71901ced23b634::t_b697e58df31c91 103
+  s_71901ced23b634::t_c58f672968b978 150
+  s_71901ced23b634::t_2d5db26aafda12 159-163,166
+  s_71901ced23b634::t_1784d3359091c9 859
+  s_71901ced23b634::t_800c25c660014d 990-996,998
+  s_71901ced23b634::t_359ec6a52bc234 151
+  s_71901ced23b634::t_7a18169643cf13 373-377
+  s_71901ced23b634::t_ae6dc62c6080f5 323-338,340-342
+  s_71901ced23b634::t_58952b926b8a15 3
+  s_71901ced23b634::t_6b9643b39ccd34 180
+  s_71901ced23b634::t_1de7c1f39fe102 410-420
+  s_71901ced23b634::t_4f92176fc85e55 1050-1061
+  s_71901ced23b634::t_106c7a6e178dbf 816-819
+  s_71901ced23b634::t_7924e7aaf958a3 625-641
+  s_71901ced23b634::t_6b42b6dd0ecff8 1092-1107
+  s_71901ced23b634::t_1791fab3a4931e 457-461,468-473
+  s_71901ced23b634::t_ff17100b504e58 95-102
+  s_71901ced23b634::t_65c4700907f022 480-481,493-497
+  s_71901ced23b634::t_891bad462b5e9b 449-450
+  s_71901ced23b634::t_d37807efe59ed9 642
+src/piece_assemble/load.py
+  s_71901ced23b634::t_4831e3d196e25f 47-52,55
+src/piece_assemble/matching/match.py
+  s_71901ced23b634::t_4cace1d882f092 196
+  s_71901ced23b634::t_99340bde89ecb9 144,154-158
+src/geometry.py
+  s_71901ced23b634::t_5b68c472af1499 443-444
+src/piece_assemble/cluster.py
+  s_71901ced23b634::t_496c59d9c0721b 363-365
+  s_71901ced23b634::t_065975fd2a5089 479,484,487-495,500-505,533,553-556,559-560
+  s_71901ced23b634::t_d2b352c8bec670 480-483,506-521,527-528,548
+  s_71901ced23b634::t_a30ea0fe6dcf2b 19
+  s_71901ced23b634::t_6cc9dbf5be5856 296,308-310
+  s_71901ced23b634::t_6a284818f5b31b 561
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "31bf084948536dd7ee0ba1498027f44609d799a9",
+  "prompts": {},
+  "sessions": {
+    "s_71901ced23b634": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "136c1b26-48f0-450d-8081-fdd90ffb5bb8",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Marcela Brichtova Piptova <marcela.brichtova.piptova@rossum.ai>"
+    }
+  }
+}
