@@ -1,0 +1,19 @@
+synth_color_50pcs_config.yaml
+  s_71901ced23b634::t_2d24f1a1349f6a 71-78
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e1848a5b8c67c4094b6647a058796a73e51e5b5f",
+  "prompts": {},
+  "sessions": {
+    "s_71901ced23b634": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "136c1b26-48f0-450d-8081-fdd90ffb5bb8",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Marcela Brichtova Piptova <marcela.brichtova.piptova@rossum.ai>"
+    }
+  }
+}
