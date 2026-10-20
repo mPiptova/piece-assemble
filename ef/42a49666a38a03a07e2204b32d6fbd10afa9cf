@@ -1,0 +1,20 @@
+docs/owl-bisection-progress.md
+  s_71901ced23b634::t_0e0ffb2a741ef0 252-256,266
+  s_71901ced23b634::t_8aaa2212085d6c 257-265
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ef42a49666a38a03a07e2204b32d6fbd10afa9cf",
+  "prompts": {},
+  "sessions": {
+    "s_71901ced23b634": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "136c1b26-48f0-450d-8081-fdd90ffb5bb8",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Marcela Brichtova Piptova <marcela.brichtova.piptova@rossum.ai>"
+    }
+  }
+}
