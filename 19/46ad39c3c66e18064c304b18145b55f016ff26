@@ -1,0 +1,20 @@
+src/piece_assemble/clustering.py
+  s_4c9c70849251e4::t_6d31a41c4e557a 885-909,911-912
+  s_4c9c70849251e4::t_8845d9dd9e4acd 849-850
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1946ad39c3c66e18064c304b18145b55f016ff26",
+  "prompts": {},
+  "sessions": {
+    "s_4c9c70849251e4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1c324d74-cf7a-4f45-ab8a-c6f705db2ee1",
+        "model": "unknown"
+      },
+      "human_author": "Marcela Brichtova Piptova <marcela.brichtova.piptova@rossum.ai>"
+    }
+  }
+}
