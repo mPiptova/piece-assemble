@@ -1,0 +1,19 @@
+docs/owl-forward-walk.md
+  s_4c9c70849251e4::t_baa8dd442995a6 368-374
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c45d979059b0ddaab058fe806b87ad524b2b86e9",
+  "prompts": {},
+  "sessions": {
+    "s_4c9c70849251e4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1c324d74-cf7a-4f45-ab8a-c6f705db2ee1",
+        "model": "unknown"
+      },
+      "human_author": "Marcela Brichtova Piptova <marcela.brichtova.piptova@rossum.ai>"
+    }
+  }
+}
