@@ -1,0 +1,31 @@
+src/piece_assemble/clustering.py
+  s_4c9c70849251e4::t_6efc99b10f9748 947-948,969,971-975
+  s_4c9c70849251e4::t_79d0840e1492c3 951-968,970
+  s_4c9c70849251e4::t_6ee0c7ca52b674 80
+  s_4c9c70849251e4::t_52a122ebf37da1 217
+  s_4c9c70849251e4::t_b85f7228174cc4 549
+  s_4c9c70849251e4::t_e3f6ef6a3a753a 131-136
+  s_4c9c70849251e4::t_a8261ad0bc758d 757,771,796,804,806,811,818,820,823-827,829-865
+  s_4c9c70849251e4::t_7d25ea66501b69 581
+  s_4c9c70849251e4::t_a6066a8317c34a 772-795,797-798,819,821-822
+  s_4c9c70849251e4::t_dc18fb3b86d6b3 882,884-888,890
+  s_4c9c70849251e4::t_5ac98097012103 883
+  s_4c9c70849251e4::t_f3a5b453e3ed0a 298-322
+  s_4c9c70849251e4::t_22f23847fab7dc 185
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "686d1ef3b84cdbcc0573828ddac344d0529ed70e",
+  "prompts": {},
+  "sessions": {
+    "s_4c9c70849251e4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1c324d74-cf7a-4f45-ab8a-c6f705db2ee1",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Marcela Brichtova Piptova <marcela.brichtova.piptova@rossum.ai>"
+    }
+  }
+}
