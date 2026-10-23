@@ -1,0 +1,22 @@
+src/piece_assemble/clustering.py
+  s_4c9c70849251e4::t_1508110c42b5fe 208
+  s_4c9c70849251e4::t_d624f3b94914dd 348-371
+  s_4c9c70849251e4::t_aaaa2aaf64e2ae 242
+  s_4c9c70849251e4::t_bb71805db51d73 82
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "76d0df3b5579e3e6caa8208030a8188b82aa1540",
+  "prompts": {},
+  "sessions": {
+    "s_4c9c70849251e4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1c324d74-cf7a-4f45-ab8a-c6f705db2ee1",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Marcela Brichtova Piptova <marcela.brichtova.piptova@rossum.ai>"
+    }
+  }
+}
