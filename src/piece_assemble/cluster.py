@@ -16,12 +16,12 @@ from skimage.transform import rotate
 
 from geometry import Transformation, get_common_contour_idxs, icp
 from piece_assemble.neighbors import get_border_complexity
+from piece_assemble.piece import TransformedPiece
 from piece_assemble.visualization import draw_contour
 
 if TYPE_CHECKING:
 
     from piece_assemble.neighbors import NeighborClassifierBase
-    from piece_assemble.piece import TransformedPiece
     from piece_assemble.types import Points
 
 
@@ -185,6 +185,29 @@ class Cluster:
         return np.mean(dists)  # type: ignore
 
     @cached_property
+    def max_pair_dist(self) -> float:
+        """Worst (highest) per-neighbor-pair mean border distance.
+
+        `dist` averages every border point pair across the whole cluster, so
+        a single badly-placed piece's error gets diluted by every other
+        (correct) pair once the cluster is large enough -- a merge that
+        replaces a correct piece with a wrong one can leave `dist` nearly
+        unchanged. This instead takes the mean per *pair* first, then the
+        max over pairs, so one bad piece-to-piece fit stays visible
+        regardless of how many other pairs are fine.
+        """
+        pair_means = []
+        for key1, key2 in combinations(self.piece_ids, 2):
+            b1, b2 = self.get_match_border_coordinates(key1, key2)
+            if b1 is None:
+                continue
+            pair_means.append(np.linalg.norm(b1 - b2, axis=1).mean())
+
+        if len(pair_means) == 0:
+            return np.inf  # type: ignore
+        return max(pair_means)
+
+    @cached_property
     def self_intersection(self) -> float:
         polygons = self.transformed_polygons
         return max(  # type: ignore
@@ -293,6 +316,7 @@ class Cluster:
         other: Cluster,
         finetune_iters: int = 3,
         try_fix: bool = True,
+        finetune_dist_tol: float | None = None,
     ) -> Cluster:
         """Merge this cluster with another cluster.
 
@@ -304,6 +328,9 @@ class Cluster:
             Number of finetuning iterations,
             After merging, ICP is run on all clusters to prevent cumulation
             of small errors.
+        finetune_dist_tol
+            Passed through to `finetune_transformations` as `dist_tol`; see
+            its docstring. Defaults to `self.border_dist_tol` when None.
 
         Returns
         -------
@@ -338,9 +365,17 @@ class Cluster:
                         f"Transformations {cluster1.pieces[key].transformation} and "
                         f"{cluster2.pieces[key].transformation} are not close."
                     )
-                parents = [cluster1]
                 was_fixed = True
-                cluster2.pieces.pop(key)
+                # Prefer the better-corroborated (larger) side's placement
+                # over always keeping self's: self being an arbitrary,
+                # possibly much smaller cluster can otherwise shear pieces
+                # off a larger, independently-correct one.
+                if len(other.pieces) > len(self.pieces):
+                    parents = [cluster2]
+                    cluster1.pieces.pop(key)
+                else:
+                    parents = [cluster1]
+                    cluster2.pieces.pop(key)
 
         new_pieces = cluster1.pieces
         new_pieces.update(cluster2.pieces)
@@ -356,7 +391,9 @@ class Cluster:
         )
 
         if finetune_iters > 0:
-            new_cluster = new_cluster.finetune_transformations(finetune_iters)
+            new_cluster = new_cluster.finetune_transformations(
+                finetune_iters, dist_tol=finetune_dist_tol
+            )
 
         self_intersection_tol = self.self_intersection_tol * (
             np.log2(len(new_cluster.pieces)) + 1
@@ -470,25 +507,61 @@ class Cluster:
 
         return new_cluster.self_intersection < self.self_intersection_tol
 
-    def finetune_transformations(self, num_iters: int = 3) -> Cluster:
+    def finetune_transformations(
+        self,
+        num_iters: int = 3,
+        min_change: float = 0.5,
+        dist_tol: float | None = None,
+    ) -> Cluster:
         """Improve transformations using ICP algorithm.
 
-        Helps preventing cumulation of small errors in large clusters.
+        Helps preventing cumulation of small errors in large clusters. Each
+        sweep only propagates a correction one piece-to-piece hop (every
+        piece is re-aligned once against the *current* positions of all
+        others), so a cluster whose adjacency graph has diameter D needs
+        roughly D sweeps for a correction on one side to reach the other.
+        `num_iters` is therefore a ceiling, not a fixed cost: sweeps stop
+        early once nothing moves by more than `min_change`, so small/already
+        -consistent clusters exit after a couple of sweeps regardless of how
+        high `num_iters` is set.
 
         Parameters
         ----------
         num_iters
-            Number of iterations. Defines how many times a position of each cluster
-            will be adjusted.
+            Maximum number of sweeps. Defines how many times a position of
+            each piece will be adjusted.
+        min_change
+            Stop early once the largest per-piece contour movement in a
+            sweep drops below this (same units/semantics as `icp`'s own
+            `min_change`).
+        dist_tol
+            ICP's correspondence search radius: a piece's contour point only
+            gets matched (and so only pulls that piece's position) toward
+            another piece's contour point within this distance. Defaults to
+            `self.border_dist_tol`, but that value is tuned for match
+            *verification* (tight on purpose, to reject bad candidates) and
+            is often too tight for this refinement use: once accumulated
+            drift pushes a piece more than border_dist_tol away from its
+            true position, ICP's correspondence search never considers the
+            correct neighbor at all and just reinforces whatever's already
+            nearby, freezing the cluster at a self-consistent but wrong
+            configuration instead of correcting it. A somewhat wider radius
+            here lets ICP escape that local minimum; too wide and it starts
+            latching onto genuinely wrong correspondences instead (visible as
+            rising self-intersection), so this is a real trade-off, not a
+            free increase.
 
         Returns
         -------
         New finetuned cluster.
         """
+        if dist_tol is None:
+            dist_tol = self.border_dist_tol
         contour_dict = {key: piece.contour for key, piece in self.pieces.items()}
 
         new_pieces = self.pieces.copy()
         for _ in range(num_iters):
+            max_change = 0.0
             for piece_id in self.piece_ids:
                 piece_contour = contour_dict[piece_id]
                 other_contours = np.concatenate(
@@ -503,12 +576,21 @@ class Cluster:
                     piece_contour,
                     other_contours,
                     Transformation.identity(),
-                    self.border_dist_tol,
+                    dist_tol,
                 )
                 new_pieces[piece_id] = new_pieces[piece_id].transform(new_transform)
 
                 new_contour = new_transform.apply(piece_contour)
+                max_change = max(
+                    max_change,
+                    np.linalg.norm(new_contour - piece_contour, axis=1).max(),
+                )
                 contour_dict[piece_id] = new_contour
+
+            # Early-stop once movement is already below min_change (already
+            # converged): saves time without changing the outcome.
+            if max_change < min_change:
+                break
 
         return Cluster(
             new_pieces,
