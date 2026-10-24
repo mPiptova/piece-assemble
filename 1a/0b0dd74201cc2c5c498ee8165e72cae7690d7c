@@ -1,0 +1,22 @@
+src/piece_assemble/cluster.py
+  s_4c9c70849251e4::t_8c09493edf8714 594
+  s_4c9c70849251e4::t_5405aa9a4c0a0b 19,187-209,319,331-333,373-378,394-396,510-515,518-526,531-552,558-559,564,579,584-587,592-593
+  s_4c9c70849251e4::t_d793e1d803ce5d 369-372
+  s_4c9c70849251e4::t_a13aa49e184c2e 590-591
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1a0b0dd74201cc2c5c498ee8165e72cae7690d7c",
+  "prompts": {},
+  "sessions": {
+    "s_4c9c70849251e4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1c324d74-cf7a-4f45-ab8a-c6f705db2ee1",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": null
+    }
+  }
+}
