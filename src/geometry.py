@@ -440,8 +440,8 @@ class Transformation:
     def to_dict(self) -> dict:
         """Return the transformation parameters as a dictionary."""
         return {
-            "rotation_angle": self.rotation_angle,
-            "translation": list(self.translation),
+            "rotation_angle": float(self.rotation_angle),
+            "translation": [float(x) for x in self.translation],
         }
 
     @classmethod
