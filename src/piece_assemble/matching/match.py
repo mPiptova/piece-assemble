@@ -48,7 +48,11 @@ class Match:
         transformation
             Transformation which maps `piece1` to match `piece2`.
         """
-        return fit_transform(self.contour1[self.idxs1], self.contour2[self.idxs2], True)
+        # Fit from the two segment endpoints; ICP refinement afterwards
+        # corrects any imprecision in this initial estimate.
+        return fit_transform(
+            self.contour1[self.idxs1][[0, -1]], self.contour2[self.idxs2][[0, -1]]
+        )
 
     def _ios(self, transformation: Transformation) -> float:
         """Computes intersection over smaller of matched pieces.
@@ -141,7 +145,7 @@ class Match:
             if not np.any(matching):
                 return None
 
-        return CompactMatch(self.id1, self.id2, transformation)
+        return CompactMatch(self.id1, self.id2, transformation, self.dist)
 
 
 @dataclass
@@ -151,6 +155,11 @@ class CompactMatch:
     id1: str
     id2: str
     transformation: Transformation
+    # Descriptor distance of the originating Match (lower = better). Kept so
+    # that consumers (Clustering.get_new_pair_clusters) can process verified
+    # matches arriving from parallel workers in quality order rather than
+    # the arrival order the workers happen to race in.
+    dist: float = 0.0
 
     def to_cluster(
         self,
@@ -188,7 +197,7 @@ class CompactMatch:
         }
 
         cluster_config["neighbor_classifier"] = ComplexityNeighborClassifier(
-            cluster_config["border_dist_tol"]
+            cluster_config["border_dist_tol"], min_complexity=0
         )
 
         return Cluster(
