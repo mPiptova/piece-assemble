@@ -17,6 +17,8 @@ if TYPE_CHECKING:
     # plain lists rather than tuples.
     Neighbors = Sequence[Sequence[str]]
     from piece_assemble.cluster import Cluster
+    from piece_assemble.feature_extraction.base import FeatureExtractor
+    from piece_assemble.piece import Piece
 
 
 def cluster_to_transformations(cluster: Cluster) -> PieceTransformations:
@@ -52,6 +54,98 @@ def get_relative_transformation(
     to get `transformation1`.
     """
     return transformation1.compose(transformation2.inverse())
+
+
+def evaluate_matching(
+    pieces: list[Piece],
+    feature_extractor: FeatureExtractor,
+    gt_neighbors: Neighbors,
+    border_dist_tol: float,
+    icp_max_iters: int,
+    icp_min_change: float,
+    n_used_matches: int = 40000,
+    check_consistency: bool = False,
+    max_match_dist: float | None = None,
+) -> dict[str, float]:
+    """Evaluate the pairwise matching stage on its own (the "local" stage),
+    independent of whatever the global assembly stage goes on to do with its
+    output.
+
+    Runs exactly the candidate generation and verification the assembly
+    pipeline itself uses (`feature_extractor.find_all_matches`, then
+    `Match.verify` with the same tolerances the clustering config passes to
+    it), and checks which piece pairs end up with at least one verified match
+    against the ground truth adjacency. Unlike the global assembly metrics in
+    `evaluate`, this involves no randomness, so repeated calls on the same
+    puzzle and config always agree.
+
+    Parameters
+    ----------
+    pieces
+        The puzzle's pieces, with features already extracted (e.g. from
+        `run_assembly.build_pieces`).
+    feature_extractor
+        The feature extractor used to build `pieces`, needed to generate
+        candidate pairwise matches between them.
+    gt_neighbors
+        Ground truth adjacent piece-id pairs.
+    border_dist_tol
+        As passed to `Match.verify` (`cluster.border_dist_tol` in a config).
+    icp_max_iters, icp_min_change
+        As passed to `Match.verify` (`clustering.icp_max_iters` /
+        `icp_min_change` in a config).
+    n_used_matches
+        Only this many highest-ranked candidate matches are verified,
+        matching `Clustering.find_candidate_matches`'s own truncation.
+    check_consistency
+        As passed to `Match.verify` (`clustering.check_consistency` in a config).
+    max_match_dist
+        If given, candidate matches whose descriptor distance (`Match.dist`)
+        exceeds this are skipped before verification (`clustering.max_match_dist`
+        in a config).
+
+    Returns
+    -------
+    A dictionary with ``match_precision``, ``match_recall``, ``match_f1``
+    (of predicted- vs. ground-truth-adjacent piece pairs) and the underlying
+    ``match_tp``/``match_fp``/``match_fn`` counts.
+    """
+    gt_pairs = {tuple(sorted(pair)) for pair in gt_neighbors}
+
+    candidate_matches = feature_extractor.find_all_matches(pieces)[:n_used_matches]
+    predicted_pairs = set()
+    for match in candidate_matches:
+        if max_match_dist is not None and match.dist > max_match_dist:
+            continue
+        verified = match.verify(
+            border_dist_tol,
+            icp_max_iters=icp_max_iters,
+            icp_min_change=icp_min_change,
+            check_consistency=check_consistency,
+        )
+        if verified is not None:
+            predicted_pairs.add(tuple(sorted((verified.id1, verified.id2))))
+
+    tp = len(predicted_pairs & gt_pairs)
+    fp = len(predicted_pairs - gt_pairs)
+    fn = len(gt_pairs - predicted_pairs)
+
+    precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+    recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+    f1 = (
+        2 * precision * recall / (precision + recall)
+        if (precision + recall) > 0
+        else 0.0
+    )
+
+    return {
+        "match_precision": precision,
+        "match_recall": recall,
+        "match_f1": f1,
+        "match_tp": tp,
+        "match_fp": fp,
+        "match_fn": fn,
+    }
 
 
 def _fixed_position_correct_piece_ratio(

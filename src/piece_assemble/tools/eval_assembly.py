@@ -1,8 +1,16 @@
 """
 Script for evaluating the assembly algorithm against ground truth puzzles.
 
+Reports two groups of metrics per puzzle: local-stage metrics score the
+pairwise matching stage alone (does it find the correct adjacent piece
+pairs, before any global assembly happens?), and global-stage metrics score
+the final assembly the search settles on. See LOCAL_METRIC_NAMES /
+GLOBAL_METRIC_NAMES below for the exact fields.
+
 Each puzzle can be assembled several times with different random seeds, since
-the assembly search is stochastic and a single run is not representative.
+the assembly search (the global stage) is stochastic and a single run is not
+representative. The local-stage metrics involve no randomness and do not
+change across repeats of the same puzzle and config.
 
 usage: eval_assembly.py [-h] [--repeats REPEATS] [--seed SEED]
                         [--output-dir OUTPUT_DIR] [--label LABEL]
@@ -44,11 +52,29 @@ import time
 from copy import deepcopy
 
 from piece_assemble.config import load_config
-from piece_assemble.evaluation import cluster_to_transformations, evaluate
+from piece_assemble.evaluation import (
+    cluster_to_transformations,
+    evaluate,
+    evaluate_matching,
+)
 from piece_assemble.load import load_puzzle
-from piece_assemble.tools.run_assembly import run_prediction
+from piece_assemble.tools.run_assembly import build_pieces, run_prediction
 
-METRIC_NAMES = [
+# "Local"-stage metrics score the pairwise matching stage alone (does it find
+# the right adjacent piece pairs?), independent of what the global assembly
+# stage goes on to do with that output. "Global"-stage metrics score the
+# final assembly (largest_cluster_ratio, num_of_clusters) and the placement
+# accuracy of pieces the global stage did assemble correctly
+# (angle/translation/transformation_error).
+LOCAL_METRIC_NAMES = [
+    "match_precision",
+    "match_recall",
+    "match_f1",
+    "match_tp",
+    "match_fp",
+    "match_fn",
+]
+GLOBAL_METRIC_NAMES = [
     "angle_error",
     "translation_error",
     "transformation_error",
@@ -56,10 +82,12 @@ METRIC_NAMES = [
     "num_of_clusters",
     "runtime_seconds",
 ]
+METRIC_NAMES = LOCAL_METRIC_NAMES + GLOBAL_METRIC_NAMES
 
 
 def evaluate_puzzle(config: dict, puzzle_dir: str, seed: int | None = None) -> dict:
-    """Assemble a single puzzle once and score the result against its ground truth.
+    """Assemble a single puzzle once and score both the pairwise matching
+    stage and the final assembly against ground truth.
 
     Parameters
     ----------
@@ -68,11 +96,16 @@ def evaluate_puzzle(config: dict, puzzle_dir: str, seed: int | None = None) -> d
     puzzle_dir
         Directory holding the puzzle's pieces and its pieces.json ground truth.
     seed
-        Seed for the assembly search, for repeatable runs.
+        Seed for the assembly search, for repeatable runs. The local matching
+        metrics do not depend on it: pairwise match generation and
+        verification involve no randomness, so they agree across repeats of
+        the same puzzle and config.
 
     Returns
     -------
-    The metrics reported by `evaluation.evaluate`, plus the wall-clock runtime.
+    The local-stage metrics from `evaluation.evaluate_matching`, the
+    global-stage metrics from `evaluation.evaluate`, and the wall-clock
+    runtime of the assembly search.
     """
     gt_pieces, neighbors = load_puzzle(puzzle_dir, scale=config["piece"]["scale"])
     gt_transformations = {
@@ -89,16 +122,38 @@ def evaluate_puzzle(config: dict, puzzle_dir: str, seed: int | None = None) -> d
             output_images_path, os.path.basename(puzzle_dir)
         )
 
+    # use_icp also gates pairwise match verification (not just the global
+    # merge-time refinement), so the local metric has to respect it the same
+    # way Clustering.__call__ does, or it would silently measure a different
+    # ICP setting than the assembly run right below it.
+    use_icp = puzzle_config["clustering"].get("use_icp", True)
+    icp_max_iters = puzzle_config["clustering"]["icp_max_iters"] if use_icp else 0
+
+    pieces, feature_extractor = build_pieces(puzzle_config)
+    metrics = evaluate_matching(
+        pieces,
+        feature_extractor,
+        neighbors,
+        puzzle_config["cluster"]["border_dist_tol"],
+        icp_max_iters,
+        puzzle_config["clustering"]["icp_min_change"],
+        puzzle_config["clustering"]["n_used_matches"],
+        check_consistency=puzzle_config["clustering"].get("check_consistency", False),
+        max_match_dist=puzzle_config["clustering"].get("max_match_dist", None),
+    )
+
     start = time.monotonic()
     clusters = run_prediction(puzzle_config)
     runtime = time.monotonic() - start
 
-    metrics = evaluate(
-        [cluster_to_transformations(cluster) for cluster in clusters],
-        gt_transformations,
-        neighbors,
-        config["cluster"]["rotation_tol"],
-        config["cluster"]["translation_tol"],
+    metrics.update(
+        evaluate(
+            [cluster_to_transformations(cluster) for cluster in clusters],
+            gt_transformations,
+            neighbors,
+            config["cluster"]["rotation_tol"],
+            config["cluster"]["translation_tol"],
+        )
     )
     metrics["runtime_seconds"] = runtime
     return dict(metrics)
