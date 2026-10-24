@@ -44,10 +44,15 @@ def load_images(
         and name not in ["pieces.json", "original.png"]
     ]
 
-    imgs = [load_img(os.path.join(img_dir, name), scale) for name in img_ids]
+    # Piece images are cropped tight to each piece's bounding box, so every
+    # mask touches the array edge on at least one side. Loading with no
+    # padding means `dilation(mask, diamond(1))` in Piece construction gets
+    # clipped by the array boundary exactly there, flattening the true
+    # dilated contour for every single piece. padding=1 avoids that.
+    imgs = [load_img(os.path.join(img_dir, name), scale, padding=1) for name in img_ids]
     img_ids = [name.split(".")[0] for name in img_ids]
     masks = [
-        load_bin_img(os.path.join(img_dir, f"{name}_mask.png"), scale)
+        load_bin_img(os.path.join(img_dir, f"{name}_mask.png"), scale, padding=1)
         for name in img_ids
     ]
     return img_ids, imgs, masks
