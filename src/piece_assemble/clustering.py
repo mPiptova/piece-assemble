@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import math
 import os
 import random
@@ -69,6 +70,11 @@ class Clustering:
         self.use_icp = True
         self.use_trusted_clusters = True
         self.use_match_reuse = True
+        self.check_consistency = False
+        self.max_match_dist = None
+        self.max_merge_dist = None
+        self.max_merge_pair_dist = None
+        self.finetune_dist_tol = None
 
         self.reset(True)
         self.set_logging(None)
@@ -87,9 +93,39 @@ class Clustering:
         self.all_pair_clusters = {}
         self.cluster_history = []
         self.assembled = False
+        # Verified matches drained from the queue but not yet processed,
+        # keyed by (id1, id2) pair and keeping only the best (lowest dist)
+        # match seen so far for that pair. get_new_pair_clusters consumes
+        # the globally-best-scoring entry each time, so matches are used in
+        # quality order even though parallel workers push to the shared
+        # queue in whatever order they each finish verifying -- and the
+        # per-pair keying prevents the same pair's ~50 near-duplicate
+        # candidates from monopolizing the front of that order.
+        self._pending_matches: dict[tuple[str, str], CompactMatch] = {}
+        self._pending_match_counter = 0
+        self._reject_reasons: dict[str, int] = {}
+        # One-shot guard for the redundant-match-trust cycle-closure check in
+        # process_new_cluster: a given pair can only ever trigger it once.
+        self._used_pair_clusters: set[frozenset[str]] = set()
+        # Sort key (lower = better, same convention as CompactMatch.dist)
+        # per _pending_matches key, computed from the match's real, fully-
+        # verified cluster.score instead of the raw descriptor distance.
+        self._pending_match_scores: dict[tuple, float] = {}
 
         if reset_all_matches:
             self.all_matches = None
+
+    def _return_to_pending(self, match: CompactMatch) -> None:
+        # Keep every verified candidate for a pair instead of collapsing to
+        # just the single best-dist one: process_new_cluster's
+        # all_pair_clusters re-sighting counter needs repeat sightings to
+        # ever promote a borderline-complexity match. Keying on a counter
+        # instead of the pair means every match gets its own slot, so the
+        # pop-by-min-dist logic elsewhere needs no change.
+        self._pending_match_counter += 1
+        self._pending_matches[
+            (match.id1, match.id2, self._pending_match_counter)
+        ] = match
 
     def set_logging(
         self,
@@ -112,9 +148,12 @@ class Clustering:
             pass
 
     def find_candidate_matches(self, n_matches: int = 40000) -> None:
-        self.all_matches = self.feature_extractor.find_all_matches(self.pieces)[
-            :n_matches
-        ]
+        # Pre-filter by is_initial_transform_valid() before applying the
+        # n_used_matches budget, so the budget is spent on plausible
+        # candidates rather than ones that can be rejected for free.
+        self.all_matches = self.feature_extractor.find_all_matches_with_preprocessing(
+            self.pieces
+        )[:n_matches]
 
     def __call__(
         self,
@@ -130,6 +169,11 @@ class Clustering:
         use_icp: bool = True,
         use_trusted_clusters: bool = True,
         use_match_reuse: bool = True,
+        check_consistency: bool = False,
+        max_match_dist: float | None = None,
+        max_merge_dist: float | None = None,
+        max_merge_pair_dist: float | None = None,
+        finetune_dist_tol: float | None = None,
         seed: int | None = None,
     ) -> Cluster | None:
         # Building a Cluster needs a neighbor classifier, which a config read
@@ -137,15 +181,28 @@ class Clustering:
         # once the first match is converted, which leaves anything constructing
         # a cluster before that (the cycle search, when running serially)
         # without it.
+        # min_complexity=0: any nonzero border complexity counts as a
+        # neighbor. The classifier's own default of 1 is stricter, which
+        # lowers avg_neighbor_count (and therefore cluster.score, which
+        # drives every selection/merge decision) for every cluster.
         cluster_config.setdefault(
             "neighbor_classifier",
-            ComplexityNeighborClassifier(cluster_config["border_dist_tol"]),
+            ComplexityNeighborClassifier(cluster_config["border_dist_tol"], min_complexity=0),
         )
 
         self.cluster_config = cluster_config
         self.use_icp = use_icp
         self.use_trusted_clusters = use_trusted_clusters
         self.use_match_reuse = use_match_reuse
+        # Kept separate from cluster_config: that dict gets splatted as
+        # **kwargs into Cluster(...) elsewhere (CompactMatch.to_cluster,
+        # TransformationGraph.cycle_to_cluster), so adding match-verification
+        # settings to it would break those constructor calls.
+        self.check_consistency = check_consistency
+        self.max_match_dist = max_match_dist
+        self.max_merge_dist = max_merge_dist
+        self.max_merge_pair_dist = max_merge_pair_dist
+        self.finetune_dist_tol = finetune_dist_tol
 
         # The search draws on two independent sources of randomness: this
         # instance's own Random, and numpy's global one. Both have to be seeded
@@ -188,7 +245,6 @@ class Clustering:
                 icp_min_change,
                 n_new_matches,
                 min_complexity,
-                queue,
             )
         return self.best_cluster
 
@@ -204,21 +260,56 @@ class Clustering:
         queue: Queue,
     ) -> None:
         matches = self.all_matches.copy()  # type: ignore
+        partitions = _partition_by_pair(matches, n_processes)
         with Pool(n_processes) as p:
             self._worker_count = n_processes
             for j in range(0, self._worker_count):
                 p.apply_async(
                     matches_checker,
                     args=(
-                        matches[j :: self._worker_count],
+                        partitions[j],
                         queue,
                         self.cluster_config,
                         icp_max_iters,
                         icp_min_change,
+                        self.check_consistency,
+                        self.max_match_dist,
                     ),
                 )
 
             self._workers_finished = 0
+            # Block here until every worker has verified its entire share of
+            # matches, instead of letting get_new_pair_clusters consume them
+            # as they stream in from whichever worker happens to finish
+            # first: with n_processes > 1 that streaming order is a race
+            # condition, so the same seed could otherwise see a different
+            # admission order from run to run. Once every match is in hand,
+            # _pending_matches gives get_new_pair_clusters a fully sorted,
+            # deterministic pop order for the rest of the run. The cost is
+            # giving up the overlap between verification and the first
+            # iterations' clustering work.
+            while self._workers_finished < self._worker_count:
+                item = queue.get()
+                if item is None:
+                    self._workers_finished += 1
+                    print("Worker finished")
+                    continue
+                self._return_to_pending(item)
+
+            # Rank by the real, fully-verified cluster.score instead of
+            # match.dist (raw descriptor distance, only a proxy for
+            # quality), now that every match is already in hand. Negated to
+            # keep the existing "lower = better" convention _pending_matches'
+            # pop sites already use for .dist.
+            pieces_dict = {piece.name: piece for piece in self.pieces}
+            for key, match in self._pending_matches.items():
+                cluster = match.to_cluster(
+                    self.cluster_scorer,
+                    self.cluster_config,
+                    pieces_dict=pieces_dict,
+                )
+                self._pending_match_scores[key] = -cluster.score
+
             for i in range(self._i, self._i + n_iters):
                 if self.assembled:
                     break
@@ -228,7 +319,6 @@ class Clustering:
                     trusted_cluster_config,
                     n_new_matches,
                     min_complexity,
-                    queue,
                 )
 
     def _run_serial(
@@ -239,21 +329,36 @@ class Clustering:
         icp_min_change: float,
         n_new_matches: int,
         min_complexity: int,
-        queue: Queue,
     ) -> None:
         all_compact_matches = []
         for match in tqdm(self.all_matches, desc="Generating matches"):
+            if self.max_match_dist is not None and match.dist > self.max_match_dist:
+                continue
             compact_match = match.verify(
                 self.cluster_config["border_dist_tol"],
                 icp_max_iters=icp_max_iters,
                 icp_min_change=icp_min_change,
+                check_consistency=self.check_consistency,
             )
-            if compact_match is not None:
-                all_compact_matches.append(compact_match)
-                queue.put(compact_match)
+            if compact_match is None:
+                continue
+            all_compact_matches.append(compact_match)
+            self._return_to_pending(compact_match)
 
         cycles = self.get_cycles(all_compact_matches)
-        self.update_trusted_clusters(cycles, lambda _: True)
+        self.update_trusted_clusters(
+            cycles,
+            lambda cluster: cluster_can_be_trusted(cluster, **trusted_cluster_config),
+        )
+
+        # Rank by the real, fully-verified cluster.score instead of
+        # match.dist, same as _run_parallel -- see get_new_pair_clusters.
+        pieces_dict = {piece.name: piece for piece in self.pieces}
+        for key, pending_match in self._pending_matches.items():
+            cluster = pending_match.to_cluster(
+                self.cluster_scorer, self.cluster_config, pieces_dict=pieces_dict
+            )
+            self._pending_match_scores[key] = -cluster.score
 
         self._worker_count = 1
         self._workers_finished = 0
@@ -267,12 +372,28 @@ class Clustering:
                 trusted_cluster_config,
                 n_new_matches,
                 min_complexity,
-                queue,
             )
 
-    def get_cycles(self, verified_matches: list[CompactMatch]) -> list[Cluster]:
+    def get_cycles(
+        self,
+        verified_matches: list[CompactMatch],
+        angle_tol: float = 0.17,
+        translation_tol: float = 30,
+    ) -> list[Cluster]:
+        # find_consistent_cycles's angle_tol/translation_tol gate which raw
+        # cycles are even attempted: dropping this pre-filter entirely (i.e.
+        # using find_cycles instead) was tried and reverted -- on a dense,
+        # false-positive-heavy match graph the raw cycle count explodes, and
+        # building a full Cluster (self-intersection, all-pairs border dist)
+        # for every one of them is too expensive to do unconditionally. The
+        # defaults mirror cluster.rotation_tol/translation_tol, but on
+        # real-photo data individual pairwise ICP alignments carry enough
+        # noise that composing 3-4 of them can exceed this tolerance even for
+        # genuinely correct cycles, so a caller may need to loosen it.
         graph = TransformationGraph.from_matches(verified_matches)
-        cycles = graph.find_consistent_cycles(3) + graph.find_consistent_cycles(4)
+        cycles = graph.find_consistent_cycles(
+            3, angle_tol, translation_tol
+        ) + graph.find_consistent_cycles(4, angle_tol, translation_tol)
         clusters = []
         pieces_dict = {piece.name: piece for piece in self.pieces}
         for cycle in cycles:
@@ -289,18 +410,20 @@ class Clustering:
         trusted_cluster_config: dict,
         n_new_matches: int,
         min_complexity: float,
-        queue: Queue,
     ) -> None:
         print(f"ITERATION {i}")
 
         new_pair_clusters = self.get_new_pair_clusters(
-            n_new_matches, queue, trusted_cluster_config, min_complexity
+            n_new_matches, trusted_cluster_config, min_complexity
         )
 
+        # A pair re-sighted at least 6 times across independently-verified
+        # candidates is promoted to trusted unconditionally: by this point
+        # repetition itself is the evidence, regardless of complexity.
         potential_trusted_clusters = []
         for all_found_pair_for_keys in self.all_pair_clusters.values():
             for pair_cluster in all_found_pair_for_keys:
-                if pair_cluster["count"] >= 10:
+                if pair_cluster["count"] >= 6:
                     potential_trusted_clusters.append(pair_cluster["cluster"])
 
         self.update_trusted_clusters(potential_trusted_clusters, lambda _: True)
@@ -332,7 +455,17 @@ class Clustering:
         self.clusters = self.use_new_matches(
             self.clusters + self.trusted_clusters, new_pair_clusters + previous_clusters
         )
-        self.clusters = self.recombine(self.clusters)
+        # Re-inject trusted clusters here too: use_new_matches already ran
+        # cluster_selection (its per-piece best-score pick), which can drop a
+        # trusted island that didn't literally win any piece this round --
+        # e.g. a disjoint trusted chunk nothing has tried to merge with yet
+        # simply won't beat whatever cluster currently holds those pieces on
+        # score alone. Without this, such an island never gets a chance to be
+        # a recombine() merge candidate again until something else happens to
+        # touch it. cluster_selection runs again inside recombine() itself,
+        # so including unneeded trusted clusters here is harmless -- they
+        # just won't be selected if nothing better comes of them.
+        self.clusters = self.recombine(self.clusters + self.trusted_clusters)
         self.clusters.sort(key=lambda cluster: cluster.score, reverse=True)
 
         self.store_iteration(f"{i}iter", self.clusters)
@@ -356,38 +489,32 @@ class Clustering:
     def get_new_pair_clusters(
         self,
         n_new_matches: int,
-        queue: Queue,
         trusted_cluster_config: dict,
         min_complexity: float,
     ) -> list[Cluster]:
+        # Pop candidates from _pending_matches in real-cluster.score order
+        # (fully populated and scored up front by _run_parallel's pre-drain,
+        # or incrementally by _run_serial) -- deterministic rather than
+        # whatever order parallel workers happen to finish verifying in.
         new_pair_clusters = []
+        self._reject_reasons = {}
+        pieces_dict = {piece.name: piece for piece in self.pieces}
 
         with tqdm(desc="Generating new matches", total=n_new_matches) as pbar:
             while len(new_pair_clusters) < n_new_matches:
-                if self._workers_finished == self._worker_count:
+                if not self._pending_matches:
                     break
-
-                if self._worker_count == 1 and queue.empty():
-                    break
-
-                if self._worker_count > 1:
-                    if queue.empty():
-                        time.sleep(1)
-                        continue
-
-                new_match = queue.get()
-
-                if new_match is None:
-                    self._workers_finished += 1
-                    print("Worker finished")
-                    continue
+                best_key = min(
+                    self._pending_matches,
+                    key=lambda k: self._pending_match_scores.get(
+                        k, self._pending_matches[k].dist
+                    ),
+                )
+                new_match = self._pending_matches.pop(best_key)
 
                 new_cluster = new_match.to_cluster(
-                    self.cluster_scorer,
-                    self.cluster_config,
-                    pieces_dict={piece.name: piece for piece in self.pieces},
+                    self.cluster_scorer, self.cluster_config, pieces_dict=pieces_dict
                 )
-                # display(np_to_pil(new_cluster.draw()))
                 new_cluster = self.process_new_cluster(
                     new_cluster, trusted_cluster_config, min_complexity
                 )
@@ -396,21 +523,74 @@ class Clustering:
                     pbar.update(1)
             return new_pair_clusters
 
+
     def process_new_cluster(
         self, new_cluster: Cluster, trusted_cluster_config: dict, min_complexity: float
     ) -> Cluster | None:
+        # Redundant-match-trust cycle-closure check: finds cycles of
+        # ARBITRARY length -- if a freshly-verified 2-piece match's both
+        # pieces are already present somewhere in an existing regular
+        # cluster, and this new match's own placement agrees with that
+        # cluster's, promote the match itself to trusted (lambda _: True,
+        # genuinely unconditional -- there's no threshold here to inflate by
+        # repetition, so no quality gate is needed on the promotion either).
+        # _used_pair_clusters is a one-shot guard: a given pair can only
+        # ever trigger this once.
+        new_keys = frozenset(new_cluster.piece_ids)
+        if new_keys not in self._used_pair_clusters:
+            self._used_pair_clusters.add(new_keys)
+            for existing in self.clusters:
+                if existing is new_cluster or not new_keys.issubset(
+                    existing.piece_ids
+                ):
+                    continue
+                if not existing.common_pieces_match(new_cluster):
+                    continue
+                promoted = self.update_trusted_clusters(
+                    [new_cluster], lambda _: True
+                )
+                new_cluster = promoted[0] if promoted else None
+                if new_cluster is None:
+                    break
+
+        if new_cluster is None:
+            return None
+
         if type(min_complexity) in (int, float):
             min_complexity = [min_complexity, min_complexity]
         if new_cluster.complexity < min_complexity[1]:
+            self._reject_reasons["complexity_floor"] = (
+                self._reject_reasons.get("complexity_floor", 0) + 1
+            )
             return None
 
+        before_trust_count = len(self.trusted_clusters)
         new_cluster_list = self.update_trusted_clusters(
             [new_cluster],
             lambda cluster: cluster_can_be_trusted(cluster, **trusted_cluster_config),
         )
+        absorbed_into_trust = (
+            len(new_cluster_list) == 0 and len(self.trusted_clusters) > before_trust_count
+        )
+        dropped_by_trust_merge = len(new_cluster_list) == 0 and not absorbed_into_trust
+
+        before_check_count = len(new_cluster_list)
         new_cluster_list = self._check_new_clusters(new_cluster_list)
+        rejected_by_check = before_check_count > 0 and len(new_cluster_list) == 0
 
         if len(new_cluster_list) == 0:
+            if absorbed_into_trust:
+                self._reject_reasons["absorbed_into_trust"] = (
+                    self._reject_reasons.get("absorbed_into_trust", 0) + 1
+                )
+            elif dropped_by_trust_merge:
+                self._reject_reasons["dropped_by_trust_merge"] = (
+                    self._reject_reasons.get("dropped_by_trust_merge", 0) + 1
+                )
+            elif rejected_by_check:
+                self._reject_reasons["rejected_by_check_new_clusters"] = (
+                    self._reject_reasons.get("rejected_by_check_new_clusters", 0) + 1
+                )
             return None
         new_cluster = new_cluster_list[0]
 
@@ -444,7 +624,6 @@ class Clustering:
         cluster1: Cluster,
         cluster2: Cluster,
         max_cluster_size: int | None,
-        randomize_order: bool = True,
         finetune_iters: int | None = None,
     ) -> Cluster | None:
         """Combine two clusters, if possible.
@@ -452,7 +631,10 @@ class Clustering:
         Parameters
         ----------
         cluster1
-            First cluster.
+            First cluster -- the merge's anchor frame (find_unifying_
+            transform resolves a conflicting shared-piece placement in
+            cluster1's favor). Callers that want a randomized anchor should
+            pick which cluster is cluster1 before calling.
         cluster2
             Second cluster.
         max_cluster_size
@@ -463,10 +645,6 @@ class Clustering:
         new_cluster
             New combined cluster.
         """
-        # merging depends on the cluster order, so let's randomize it
-        if randomize_order and self.random.random() < 0.5:
-            cluster2, cluster1 = cluster1, cluster2
-
         if (
             max_cluster_size is not None
             and len(cluster1.piece_ids.union(cluster2.piece_ids)) > max_cluster_size
@@ -481,13 +659,48 @@ class Clustering:
             return None
 
         if finetune_iters is None:
-            finetune_iters = 5
+            finetune_iters = 20
         if not self.use_icp:
             finetune_iters = 0
 
         try:
-            new_cluster = cluster1.merge(cluster2, finetune_iters=finetune_iters)
+            new_cluster = cluster1.merge(
+                cluster2,
+                finetune_iters=finetune_iters,
+                finetune_dist_tol=self.finetune_dist_tol,
+            )
         except Exception:
+            return None
+
+        # Merging never fails purely because the result is geometrically
+        # inconsistent: `merge` only raises for a disagreeing anchor-piece
+        # transform or excessive self-intersection (whose tolerance actually
+        # *loosens* as clusters grow, via self_intersection_tol * (log2(n)+1)
+        # in Cluster.merge). cluster.dist -- the same all-pairs border-gap
+        # residual already used to judge ordinary 2-piece matches and to
+        # decide trust -- is otherwise only used for scoring, never to reject
+        # a merge outright. That means a badly-aligned merge of two large,
+        # internally-drifted clusters can still go through as long as no
+        # exception fires, and once it does, nothing later undoes it: if it's
+        # the only candidate covering those piece IDs that round,
+        # cluster_selection has no better alternative to prefer instead. This
+        # gate makes that failure mode explicit and preventable by rejecting
+        # the merge outright, the same way Match.verify already rejects a
+        # 2-piece candidate whose residual is too high.
+        if self.max_merge_dist is not None and new_cluster.dist > self.max_merge_dist:
+            return None
+        # max_merge_dist uses the cluster-wide mean, which a single
+        # badly-placed piece can't move much once the cluster has enough
+        # other (correct) pairs -- confirmed on owl_101pcs: a merge that
+        # replaced 10 correct pieces with 10 wrong ones left cluster.dist
+        # nearly unchanged (0.995 -> 0.973), so it sailed through this gate.
+        # max_pair_dist takes the max over per-pair means instead of
+        # pooling every point from every pair together, so one bad
+        # piece-to-piece fit stays visible regardless of cluster size.
+        if (
+            self.max_merge_pair_dist is not None
+            and new_cluster.max_pair_dist > self.max_merge_pair_dist
+        ):
             return None
         return new_cluster
 
@@ -506,9 +719,7 @@ class Clustering:
             }
 
             for c2 in clusters:
-                new_cluster = self.combine(
-                    c1, c2, max_cluster_size, randomize_order=False, finetune_iters=3
-                )
+                new_cluster = self.combine(c1, c2, max_cluster_size, finetune_iters=10)
                 if new_cluster is None:
                     continue
                 key = frozenset(new_cluster.piece_ids)
@@ -549,6 +760,15 @@ class Clustering:
             new_clusters_dict = {
                 frozenset(cluster.piece_ids): cluster for cluster in clusters
             }
+            # Tried sorting by score descending instead of shuffling (so
+            # higher-scoring clusters get first crack at finding a partner
+            # each pass, since a cluster is marked "used" after one success
+            # and can't try again until the next pass) -- confirmed worse in
+            # practice (ratio 0.881 -> 0.495 on owl_101pcs): always giving
+            # the same few big clusters first priority starves smaller ones
+            # of a chance to find *their* best partner before being crowded
+            # out, pass after pass. The random shuffle's exploration value
+            # outweighs the theoretical benefit of greedy-by-score ordering.
             self.random.shuffle(clusters)
 
             used_pieces = set()
@@ -564,20 +784,42 @@ class Clustering:
                         if key1 in used_pieces or key2 in used_pieces:
                             continue
 
-                        new_cluster = self.combine(c1, c2, max_cluster_size)
+                        # Randomize which cluster anchors the merge frame
+                        # (combine()'s cluster1): find_unifying_transform
+                        # resolves a conflicting shared-piece placement in
+                        # the anchor's favor, and which side wins can change
+                        # the result on a true ambiguity. Only affects this
+                        # call, not c1/c2 themselves (used below by key1/
+                        # key2/used_pieces).
+                        merge_c1, merge_c2 = (
+                            (c2, c1) if self.random.random() < 0.5 else (c1, c2)
+                        )
+                        new_cluster = self.combine(merge_c1, merge_c2, max_cluster_size)
                         if new_cluster is None:
                             continue
 
                         new_key = frozenset(new_cluster.piece_ids)
+                        # Dominated-cluster pruning: dropping a merge input
+                        # once it's been absorbed into a larger result avoids
+                        # repeatedly re-attempting merges against clusters
+                        # that can no longer win (a large speedup on owl_101pcs).
+                        dominated_keys = {
+                            key for key in (key1, key2) if key != new_key
+                        }
                         if new_key in new_clusters_dict.keys():
                             if new_clusters_dict[new_key].score < new_cluster.score:
                                 new_clusters_dict[new_key] = new_cluster
+                                new_clusters_added = True
                         else:
-                            used_pieces.update(
-                                {key for key in (key1, key2) if len(key) > 2}
-                            )
                             new_clusters_dict[new_key] = new_cluster
                             new_clusters_added = True
+                        for key in dominated_keys:
+                            if len(key) > 2 and key in new_clusters_dict:
+                                del new_clusters_dict[key]
+                                new_clusters_added = True
+                        used_pieces.update(
+                            {key for key in (key1, key2) if len(key) > 2}
+                        )
 
             if len(new_clusters_dict.values()) == len(clusters):
                 new_clusters_added = False
@@ -591,7 +833,23 @@ class Clustering:
         clusters = self.apply_trusted_clusters(clusters)
         if len(clusters) == 0:
             return self.trusted_clusters
-        return clusters
+        clusters.sort(key=lambda cluster: cluster.score, reverse=True)
+        return self._prune_dominated(clusters)
+
+    @staticmethod
+    def _prune_dominated(clusters: list[Cluster]) -> list[Cluster]:
+        """Drop any cluster that is a strict subset of an earlier
+        (assumed higher-scoring) one in the same list. Needed both after
+        cluster_selection's own voting and again here after
+        apply_trusted_clusters, since applying a trusted cluster can itself
+        create a new domination relationship cluster_selection never had a
+        chance to see."""
+        pruned: list[Cluster] = []
+        for cluster in clusters:
+            if any(cluster.piece_ids < kept.piece_ids for kept in pruned):
+                continue
+            pruned.append(cluster)
+        return pruned
 
     def cluster_selection(self, clusters: list[Cluster]) -> list[Cluster]:
         """Select best cluster representative.
@@ -626,7 +884,19 @@ class Clustering:
 
         selection = [clusters[i] for i in selected_cluster_idxs]
         selection.sort(key=lambda cluster: cluster.score, reverse=True)
-        return selection
+
+        # combine() refuses to even attempt a merge between a cluster and
+        # its own subset/superset, so recombine()'s own dominated-cluster
+        # pruning never gets a chance to run for this exact relationship --
+        # prune it here instead.
+        pruned_selection = []
+        for cluster in selection:
+            if any(
+                cluster.piece_ids < kept.piece_ids for kept in pruned_selection
+            ):
+                continue
+            pruned_selection.append(cluster)
+        return pruned_selection
 
     def apply_trusted_clusters(self, clusters: list[Cluster]) -> list[Cluster]:
         """Extend given clusters by trusted clusters.
@@ -653,7 +923,10 @@ class Clustering:
                     continue
                 try:
                     cluster = trusted_cluster.merge(
-                        cluster, try_fix=True, finetune_iters=5 if self.use_icp else 0
+                        cluster,
+                        try_fix=True,
+                        finetune_iters=20 if self.use_icp else 0,
+                        finetune_dist_tol=self.finetune_dist_tol,
                     )
                 except Exception:
                     cluster = None
@@ -689,7 +962,12 @@ class Clustering:
                     continue
                 if trust_function(cluster):
                     try:
-                        cluster = cluster.merge(trusted_cluster, try_fix=False)
+                        cluster = cluster.merge(
+                            trusted_cluster,
+                            try_fix=False,
+                            finetune_iters=20 if self.use_icp else 0,
+                            finetune_dist_tol=self.finetune_dist_tol,
+                        )
                         used_trusted_clusters.append(trusted_cluster)
                     except Exception:
                         cluster = None
@@ -760,17 +1038,23 @@ class Clustering:
         previous_cluster_list = self._check_new_clusters(previous_cluster_list)
         if len(previous_cluster_list) > 0:
             worst_score = min([cluster.score for cluster in previous_cluster_list])
+            # Candidates that only share a single piece with the current
+            # cluster (a bridge into otherwise-unconnected territory) get
+            # their score margin raised to the 4th power, so a strong bridge
+            # candidate dominates the draw instead of being drowned out by
+            # many weaker same-cluster candidates with a smaller individual
+            # margin each.
             probabilities = np.array(
                 [
                     (
-                        (cluster.score - worst_score) ** 4
-                        if cluster.piece_ids.intersection(cluster.piece_ids) == 1
-                        else (cluster.score - worst_score)
+                        (c.score - worst_score) ** 4
+                        if len(c.piece_ids.intersection(cluster.piece_ids)) == 1
+                        else (c.score - worst_score)
                     )
-                    for cluster in previous_cluster_list
+                    for c in previous_cluster_list
                 ]
             )
-            probabilities = probabilities**0.5 + +0.0000001
+            probabilities = probabilities**0.5 + 0.0000001
             probabilities = probabilities / sum(probabilities)
 
             previous_clusters = list(
@@ -817,7 +1101,17 @@ class Clustering:
 
         for i, cluster in enumerate(clusters):
             img = np_to_pil(rescale(cluster.draw(), 0.5, channel_axis=2))
-            img.save(get_image_path(i, cluster))
+            image_path = get_image_path(i, cluster)
+            img.save(image_path)
+            # Sidecar with the same basename as the image, in the same
+            # {transformed_pieces, neighbors} schema as a puzzle's own
+            # ground-truth pieces.json (Transformation.to_dict() matches
+            # Transformation.from_dict()'s expected format exactly), so a
+            # stored cluster can be loaded and compared against ground truth
+            # with the same code that already reads pieces.json, instead of
+            # guessing piece placement from colors/shapes by eye.
+            with open(os.path.splitext(image_path)[0] + ".json", "w") as f:
+                json.dump(cluster.to_dict(), f)
 
 
 def cluster_can_be_trusted(
@@ -853,22 +1147,65 @@ def cluster_can_be_trusted(
     )
 
 
+def _unordered_pair(id1: str, id2: str) -> tuple[str, str]:
+    return (id1, id2) if id1 <= id2 else (id2, id1)
+
+
+def _partition_by_pair(matches: list[Match], n_processes: int) -> list[list[Match]]:
+    """Split matches across workers by which piece-pair they belong to,
+    keeping every candidate for a given pair in the same partition.
+
+    Splitting by plain list position (`matches[j::n_processes]`) scatters a
+    single pair's ~50 near-duplicate candidates across every worker, since
+    striding by index cycles through all workers regardless of which pair a
+    match belongs to. Hash-grouping instead lets one worker verify a pair's
+    near-duplicates back-to-back, so that pair's true best candidate
+    stabilizes in `_pending_matches` quickly; round-robin striding scatters
+    them across every worker instead, which can delay that stabilization
+    since it now depends on all workers reaching their scattered share --
+    confirmed to measurably regress `synth_color_50pcs`'s reliability, so
+    hash-grouping is used instead. Keeps each partition's relative
+    distance-sorted order, same as plain striding did.
+    """
+    partitions: list[list[Match]] = [[] for _ in range(n_processes)]
+    for match in matches:
+        pair = _unordered_pair(match.id1, match.id2)
+        partitions[hash(pair) % n_processes].append(match)
+    return partitions
+
+
 def matches_checker(
     matches: list[Match],
     queue: Queue,
     config: dict,
     icp_max_iters: int,
     icp_min_change: float = 0.5,
+    check_consistency: bool = False,
+    max_match_dist: float | None = None,
 ) -> None:
     try:
         for match in matches:
-            compact_match = match.verify(
-                config["border_dist_tol"],
-                icp_max_iters=icp_max_iters,
-                icp_min_change=icp_min_change,
-            )
-            if compact_match is not None:
-                queue.put(compact_match)
+            if max_match_dist is not None and match.dist > max_match_dist:
+                continue
+            # A single geometrically-degenerate candidate (e.g. shapely
+            # raising on a self-intersecting polygon from a rough initial
+            # transform) must not kill the rest of this worker's share of
+            # matches -- previously an unguarded exception here propagated
+            # out of the loop entirely, silently dropping every remaining
+            # match assigned to this worker for the rest of the run.
+            try:
+                compact_match = match.verify(
+                    config["border_dist_tol"],
+                    icp_max_iters=icp_max_iters,
+                    icp_min_change=icp_min_change,
+                    check_consistency=check_consistency,
+                )
+            except Exception as e:
+                print(f"Match verification failed for {match}: {e}")
+                continue
+            if compact_match is None:
+                continue
+            queue.put(compact_match)
     except Exception as e:
         print(e)
     finally:
