@@ -1,0 +1,20 @@
+src/piece_assemble/matching/match.py
+  s_4c9c70849251e4::t_88faf662565415 51-52
+  s_4c9c70849251e4::t_5405aa9a4c0a0b 53-55,148,158-162,200
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3108f0911f638c92409bc6b1b78197ba3cea015c",
+  "prompts": {},
+  "sessions": {
+    "s_4c9c70849251e4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1c324d74-cf7a-4f45-ab8a-c6f705db2ee1",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": null
+    }
+  }
+}
