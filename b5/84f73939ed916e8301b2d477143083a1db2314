@@ -1,0 +1,55 @@
+src/piece_assemble/tools/reconstruct_gt.py
+  s_4c9c70849251e4::t_24e1ef035ffbe8 447-448,459,484,486-489
+  s_4c9c70849251e4::t_bd404adcbaa875 426,432
+  s_4c9c70849251e4::t_cb383759d24a76 49
+  s_4c9c70849251e4::t_ddd1a1a0fdd5a5 815-817
+  s_4c9c70849251e4::t_f8f9d7677e0529 573,576-581,591,600-602,604-608,610
+  s_4c9c70849251e4::t_9bf57231cbb378 550-572,574-575,582-590,592-599,603,609,611-627
+  s_4c9c70849251e4::t_79c071382667d6 876,884-888
+  s_4c9c70849251e4::t_6604c3b6b96bac 867-875,877-883,889-903
+  s_4c9c70849251e4::t_3f76ad3f36a179 514
+  s_4c9c70849251e4::t_80df1dde1b95f5 201-202
+negative_14pcs_config.yaml
+  s_4c9c70849251e4::t_02e0e3c80f440d 1-65
+src/piece_assemble/clustering.py
+  s_4c9c70849251e4::t_e98d33c0b3603d 210-212
+  s_4c9c70849251e4::t_565fd640f5b5f1 248-250
+  s_4c9c70849251e4::t_a61ab649a09106 84-86
+  s_4c9c70849251e4::t_7d7ebc402d919b 516
+  s_4c9c70849251e4::t_44968aca4e2898 1260,1267
+data/owl_100pcs_no83/pieces.json
+  s_4c9c70849251e4::t_fced69fdff7e51 1
+data/negative_14pcs/pieces.json
+  s_4c9c70849251e4::t_ff46c315906134 3,5-231
+  s_4c9c70849251e4::t_f2392147c1b7f1 1-2
+  s_4c9c70849251e4::t_0dbddfa2f60543 4
+  s_4c9c70849251e4::t_049aa77d3706d5 232-234
+src/piece_assemble/tools/eval_assembly.py
+  s_4c9c70849251e4::t_785f9263bf4bf0 121-124,126
+negative_14pcs_best_config.yaml
+  s_4c9c70849251e4::t_5b6ffcacde9a33 1-87
+src/piece_assemble/cluster.py
+  s_4c9c70849251e4::t_048e8e1d28e1fc 374-375
+  s_4c9c70849251e4::t_99a8dcbdaf416c 337-342
+docs/owl-forward-walk.md
+  s_4c9c70849251e4::t_cd96b3d59f816c 530-733,736-745
+src/piece_assemble/feature_extraction/segment.py
+  s_4c9c70849251e4::t_74b59b9c2ecc0a 224-230
+  s_4c9c70849251e4::t_02caa52c3fa962 234-241
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b584f73939ed916e8301b2d477143083a1db2314",
+  "prompts": {},
+  "sessions": {
+    "s_4c9c70849251e4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1c324d74-cf7a-4f45-ab8a-c6f705db2ee1",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Marcela Brichtova Piptova <marcela.brichtova.piptova@rossum.ai>"
+    }
+  }
+}
