@@ -1,0 +1,80 @@
+# Configuration tuned for 30-piece synth_artworks-style puzzles (see
+# docs/evaluation-results.md, 2026-10-07 entry, for how it was derived and
+# what it does to the results). Differs from synth_artworks_10pcs_config.yaml
+# in clustering.n_new_matches, clustering.n_iters and clustering.dedupe_matches
+# only, scaled up for the larger candidate-pair space at this piece count.
+#
+# img_path below is a placeholder; point it at any synth_artworks-style puzzle
+# directory (piece images/masks plus a pieces.json ground truth) before use.
+img_path: ""
+
+# Logging settings, optional.
+logging:
+  output_images_path: null
+  store_new_matches: False
+  store_old_matches: False
+  store_trusted_clusters: False
+
+# Defines the parameters of the piece representation
+piece:
+  # Polygon approximation precision
+  # Smaller values mean more precise approximation, but large number of points
+  polygon_approximation_tolerance: 3
+  # sigma for Gaussian blur used for color features extraction
+  sigma: 4
+  # Scale of the images. Smaller scale means faster but less precise computation.
+  scale: 1
+
+descriptor:
+  # Minimum length of a line segment, smaller segments will be deleted
+  min_segment_len: 0
+  # Number of points used for the spatial descriptor for each segment
+  n_points: 5
+  # Number of points used for the color descriptor for each segment
+  n_colors: 7
+  # Weights for distance computation
+  spatial_dist_w: 1
+  color_dist_w: 11
+  color_var_w: 0
+  length_w: 110
+  rel_len_diff_w: 5
+  angle_w: 0
+  # Tolerances for osculating circle approximation
+  tol_dists: [2, 3]
+
+cluster:
+  border_dist_tol: 4
+  self_intersection_tol: 0.02
+  rotation_tol: 0.17
+  translation_tol: 30
+
+cluster_scorer:
+  w_convexity: 2
+  w_complexity: 2
+  w_color_dist: 1000
+  w_dist: 50
+  w_border_length: 0.1
+
+trusted_cluster:
+  complexity_threshold: 4
+  color_threshold: 0.01
+  dist_threshold: 1.15
+
+clustering:
+  # Scaled 3x from the 10-piece config's value of 10: the candidate-pair space
+  # grows ~9.7x (45 -> 435 pairs) going from 10 to 30 pieces, so the same
+  # per-iteration budget covers a much thinner slice of it unless scaled up -
+  # see docs/evaluation-results.md for the measurements this is based on.
+  n_new_matches: 30
+  min_complexity: [0, 0]
+  # Scaled 2x from the 10-piece config's value of 20, alongside n_new_matches.
+  n_iters: 40
+  icp_max_iters: 100
+  icp_min_change: 0.3
+  n_processes: 4
+  n_used_matches: 40000
+  # More piece-pairs means more near-duplicate verified matches per pair
+  # competing for the same fixed per-iteration queue-pull budget; dropping
+  # duplicates (keeping only the best, since matches are already
+  # distance-sorted) matters more here than at 10 pieces.
+  dedupe_matches: true

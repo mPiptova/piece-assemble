@@ -1,0 +1,76 @@
+# Configuration for data/synth_grayscale_50pcs (one of the paper's original
+# 50-piece synthetic datasets -- see docs/evaluation-results.md,
+# 2026-10-19 entry, and run_assembly.py's --save-results default for how to
+# inspect the result). data/synth_grayscale_50pcs/pieces.json IS ground truth
+# (contrary to the 2026-10-14 entry below) -- evaluation.get_correctly_predicted_clusters
+# works on it directly, same as owl_101pcs.
+#
+# Starts from sample_config.yaml (tuned for data/owl_101pcs) since these
+# pieces, like owl's, have irregular (here: jagged/torn, simulating a broken
+# negative) rather than straight-cut borders -- unlike synth_artworks, whose
+# min_complexity override assumes straight cuts and would be wrong here.
+# clustering.n_new_matches and dedupe_matches are raised from
+# sample_config.yaml's defaults: the candidate-pair space here is smaller
+# than owl's (50 vs 101 pieces) but these pieces lack owl's real-jigsaw
+# shape distinctiveness, so false-candidate volume is proportionally higher
+# -- the same search-budget-scaling finding as the synth_artworks_30pcs work.
+img_path: "data/synth_grayscale_50pcs"
+
+# Logging settings, optional. Per-iteration diagnostic dumps left off;
+# run_assembly.py's --save-results (on by default) saves just the final
+# top-scoring assemblies.
+logging:
+  output_images_path: null
+  store_new_matches: False
+  store_old_matches: False
+  store_trusted_clusters: False
+
+piece:
+  polygon_approximation_tolerance: 3
+  sigma: 4
+  scale: 0.5
+
+descriptor:
+  min_segment_len: 0
+  n_points: 5
+  n_colors: 7
+  spatial_dist_w: 1
+  color_dist_w: 11
+  color_var_w: 0
+  length_w: 110
+  rel_len_diff_w: 5
+  angle_w: 0
+  tol_dists: [2, 3]
+
+cluster:
+  border_dist_tol: 4
+  self_intersection_tol: 0.02
+  rotation_tol: 0.17
+  translation_tol: 30
+
+cluster_scorer:
+  w_convexity: 2
+  w_complexity: 2
+  w_color_dist: 1000
+  w_dist: 50
+  w_border_length: 0.1
+
+trusted_cluster:
+  complexity_threshold: 4
+  color_threshold: 0.01
+  dist_threshold: 1.15
+
+clustering:
+  n_new_matches: 30
+  # [0.5, 0.5]: same pool-exhaustion fix applied to sample_config.yaml and
+  # synth_color_50pcs_config.yaml after confirming [2, 0.5] drains the whole
+  # candidate pool in iteration 0 via the complexity_floor gate; not directly
+  # re-confirmed on this dataset but the config lineage and symptom are the
+  # same, so applying preventatively.
+  min_complexity: [0.5, 0.5]
+  n_iters: 20
+  icp_max_iters: 100
+  icp_min_change: 0.3
+  n_processes: 4
+  n_used_matches: 40000
+  dedupe_matches: true

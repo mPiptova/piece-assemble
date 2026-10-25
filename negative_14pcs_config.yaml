@@ -1,0 +1,65 @@
+# Configuration for data/negative_14pcs, the real case-study dry-plate
+# negative fragments (13 numbered pieces + "pannelli", the base panel they
+# attach to -- see output/results/negative_14pcs_gt/ for how pieces.json's
+# ground truth was built: the user manually placed each piece in an
+# interactive web tool against the restoration team's own reconstruction
+# photo, confirmed piece by piece).
+#
+# Adapted from the historical tuning in ~/vyzkumak_old/negative_config.yaml
+# (paths there are stale, from before a username/account change) -- kept
+# as-is otherwise. scale: 1 (no downscaling) was a deliberate choice there
+# (a commented-out scale: 0.25 alternative was tried and rejected) -- these
+# are real, already-small torn fragment photos (as small as ~90x75px
+# natively), so further downscaling would throw away detail that's already
+# scarce, unlike owl_101pcs/synth's much larger source photos.
+img_path: "/Users/marcela.brichtova-piptova/piece-assemble/data/negative_14pcs"
+
+logging:
+  output_images_path: "/Users/marcela.brichtova-piptova/piece-assemble/output/puzzle/negative_14pcs_baseline"
+  store_new_matches: True
+  store_old_matches: True
+  store_trusted_clusters: True
+
+cluster:
+  border_dist_tol: 10
+  self_intersection_tol: 0.06
+  rotation_tol: 0.17
+  translation_tol: 150
+
+cluster_scorer:
+  w_convexity: 0
+  w_complexity: 2
+  w_color_dist: 1000
+  w_dist: 100
+  w_border_length: 0.1
+
+trusted_cluster:
+  complexity_threshold: 4
+  color_threshold: 0.01
+  dist_threshold: 2
+
+piece:
+  polygon_approximation_tolerance: 1
+  sigma: 2
+  scale: 1
+
+descriptor:
+  min_segment_len: 0
+  n_points: 5
+  n_colors: 0
+  spatial_dist_w: 1
+  color_dist_w: 11
+  color_var_w: 0
+  length_w: 110
+  rel_len_diff_w: 5
+  angle_w: 0
+  tol_dists: [2, 1]
+
+clustering:
+  n_new_matches: 5
+  min_complexity: [2, 0.5]
+  n_iters: 5
+  icp_max_iters: 100
+  icp_min_change: 1
+  n_processes: 4
+  n_used_matches: 1000

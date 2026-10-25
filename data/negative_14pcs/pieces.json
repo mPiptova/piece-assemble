@@ -1,0 +1,238 @@
+{
+  "transformed_pieces": [
+    {
+      "id": "p1",
+      "transformation": {
+        "rotation_angle": 1.6057029118347832,
+        "translation": [
+          1953.630827921205,
+          615.4666449590981
+        ]
+      }
+    },
+    {
+      "id": "p2",
+      "transformation": {
+        "rotation_angle": 1.53588974175501,
+        "translation": [
+          1718.7321722147187,
+          555.995630673777
+        ]
+      }
+    },
+    {
+      "id": "p3",
+      "transformation": {
+        "rotation_angle": 2.897246558310587,
+        "translation": [
+          1831.75712500533,
+          1171.9132891445834
+        ]
+      }
+    },
+    {
+      "id": "p4",
+      "transformation": {
+        "rotation_angle": 0.06981317007977318,
+        "translation": [
+          2076.912492283349,
+          2464.2219069057373
+        ]
+      }
+    },
+    {
+      "id": "p5",
+      "transformation": {
+        "rotation_angle": 0.10471975511965978,
+        "translation": [
+          1449.7302178326531,
+          832.4377730532822
+        ]
+      }
+    },
+    {
+      "id": "p6",
+      "transformation": {
+        "rotation_angle": 5.201081170943102,
+        "translation": [
+          2356.9690492782324,
+          945.9789400000835
+        ]
+      }
+    },
+    {
+      "id": "p7",
+      "transformation": {
+        "rotation_angle": 1.4835298641951802,
+        "translation": [
+          1399.621810562089,
+          2481.302988177854
+        ]
+      }
+    },
+    {
+      "id": "p8",
+      "transformation": {
+        "rotation_angle": 1.6231562043547265,
+        "translation": [
+          1274.7797684147486,
+          1238.8905257568467
+        ]
+      }
+    },
+    {
+      "id": "p9",
+      "transformation": {
+        "rotation_angle": 2.705260340591211,
+        "translation": [
+          1618.385331459165,
+          1761.2438474057026
+        ]
+      }
+    },
+    {
+      "id": "p10",
+      "transformation": {
+        "rotation_angle": 3.7524578917878086,
+        "translation": [
+          166.1911749220581,
+          3254.2041390058016
+        ]
+      }
+    },
+    {
+      "id": "p11",
+      "transformation": {
+        "rotation_angle": 0.9424777960769379,
+        "translation": [
+          1516.3315741245108,
+          963.5226222946904
+        ]
+      }
+    },
+    {
+      "id": "p12",
+      "transformation": {
+        "rotation_angle": 4.423,
+        "translation": [
+          2162.421021750643,
+          2852.953505963683
+        ]
+      }
+    },
+    {
+      "id": "p13",
+      "transformation": {
+        "rotation_angle": 3.5779249665883754,
+        "translation": [
+          2077.019621025168,
+          603.7942078372595
+        ]
+      }
+    },
+    {
+      "id": "pannelli",
+      "transformation": {
+        "rotation_angle": 0.0,
+        "translation": [
+          74.7946962006431,
+          213.1807601536832
+        ]
+      }
+    }
+  ],
+  "neighbors": [
+    [
+      "p8",
+      "p1"
+    ],
+    [
+      "p13",
+      "p2"
+    ],
+    [
+      "p8",
+      "pannelli"
+    ],
+    [
+      "p10",
+      "pannelli"
+    ],
+    [
+      "p8",
+      "p5"
+    ],
+    [
+      "pannelli",
+      "p2"
+    ],
+    [
+      "p8",
+      "p13"
+    ],
+    [
+      "pannelli",
+      "p11"
+    ],
+    [
+      "pannelli",
+      "p6"
+    ],
+    [
+      "p3",
+      "p5"
+    ],
+    [
+      "p7",
+      "p4"
+    ],
+    [
+      "p8",
+      "p3"
+    ],
+    [
+      "pannelli",
+      "p5"
+    ],
+    [
+      "p1",
+      "p2"
+    ],
+    [
+      "pannelli",
+      "p7"
+    ],
+    [
+      "pannelli",
+      "p4"
+    ],
+    [
+      "pannelli",
+      "p3"
+    ],
+    [
+      "p9",
+      "p6"
+    ],
+    [
+      "p7",
+      "p6"
+    ],
+    [
+      "p13",
+      "p1"
+    ],
+    [
+      "p11",
+      "p5"
+    ],
+    [
+      "p11",
+      "p3"
+    ],
+    [
+      "pannelli",
+      "p12"
+    ]
+  ]
+}
