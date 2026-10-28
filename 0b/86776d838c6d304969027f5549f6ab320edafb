@@ -1,0 +1,55 @@
+data/negative_14pcs/pieces.json
+  s_4c9c70849251e4::t_e4ccec3358bbb1 1-115,117,120-231,236-238
+  s_4c9c70849251e4::t_3a1485e8533f0d 116,118-119
+  s_4c9c70849251e4::t_67c3a4e5a71262 232-235
+data/synth_color_50pcs/pieces.json
+  s_4c9c70849251e4::t_43a04f335827f0 1-998
+synth_artworks_30pcs_config.yaml
+  s_4c9c70849251e4::t_6faebb35500701 1-80
+data/synth_white_50pcs/pieces.json
+  s_4c9c70849251e4::t_adc309da61930c 684-686
+  s_4c9c70849251e4::t_43a04f335827f0 1-683
+  s_4c9c70849251e4::t_ac496ca4829faf 687-809
+  s_4c9c70849251e4::t_dcf8dc6cee322c 810-812
+  s_4c9c70849251e4::t_b0ee7baf0882aa 813-998
+synth_grayscale_50pcs_config.yaml
+  s_4c9c70849251e4::t_6faebb35500701 4-5,7,12-49,50-55
+  s_4c9c70849251e4::t_3fd505922921f1 1-3,6,8-11
+data/synth_grayscale_50pcs/pieces.json
+  s_4c9c70849251e4::t_1be63b3803d6fb 789-791
+  s_4c9c70849251e4::t_43a04f335827f0 1-788
+  s_4c9c70849251e4::t_5cbabe86a1d041 792-998
+negative_14pcs_config.yaml
+  s_4c9c70849251e4::t_6faebb35500701 1-2,5,7,9-12,39-42,46-59,60,64-65
+  s_4c9c70849251e4::t_67a06822920914 3-4,6,8,13-38,43-45,61-63,66-67
+synth_white_50pcs_config.yaml
+  s_4c9c70849251e4::t_6faebb35500701 4-5,7,12-49,50-55
+  s_4c9c70849251e4::t_b21336c7bf34f8 1-3,6,8-11
+synth_color_50pcs_config.yaml
+  s_4c9c70849251e4::t_6faebb35500701 4-5,7,12-14,15-30,31-48,49,50,51-55
+  s_4c9c70849251e4::t_2746ec07012d0a 1-3,6,8-11
+data/owl_101pcs/pieces.json
+  s_4c9c70849251e4::t_67c3a4e5a71262 1902-1905
+  s_4c9c70849251e4::t_dbe2c68e58aea8 1-975,977,980-1901,1906-1908
+  s_4c9c70849251e4::t_3a1485e8533f0d 976,978-979
+owl_101pcs_config.yaml
+  s_4c9c70849251e4::t_8dd122c21b8bc4 1-63
+.gitignore
+  s_4c9c70849251e4::t_8d2aff7e36bd1e 6
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0b86776d838c6d304969027f5549f6ab320edafb",
+  "prompts": {},
+  "sessions": {
+    "s_4c9c70849251e4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1c324d74-cf7a-4f45-ab8a-c6f705db2ee1",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": null
+    }
+  }
+}
