@@ -1,0 +1,23 @@
+src/piece_assemble/piece.py
+  s_4c9c70849251e4::t_e6023cebd7f265 120-132,137,139-141,145-164
+  s_4c9c70849251e4::t_935d291957704e 133-136,138,142-144
+  s_4c9c70849251e4::t_4c1d0c52ad0e6b 112-114,119
+src/piece_assemble/feature_extraction/segment.py
+  s_4c9c70849251e4::t_9accb948c40496 316-321
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "57ea90c9063f62dc820a33ee2d5e7a2feb99e338",
+  "prompts": {},
+  "sessions": {
+    "s_4c9c70849251e4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1c324d74-cf7a-4f45-ab8a-c6f705db2ee1",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Marcela Brichtova Piptova <marcela.brichtova.piptova@rossum.ai>"
+    }
+  }
+}
