@@ -1,0 +1,49 @@
+synth_grayscale_50pcs_config.yaml
+  s_4c9c70849251e4::t_6faebb35500701 1-76
+data/negative_14pcs/pieces.json
+  s_4c9c70849251e4::t_e4ccec3358bbb1 1-115,117,120-231,236-238
+  s_4c9c70849251e4::t_67c3a4e5a71262 232-235
+  s_4c9c70849251e4::t_3a1485e8533f0d 116,118-119
+data/synth_color_50pcs/pieces.json
+  s_4c9c70849251e4::t_43a04f335827f0 1-998
+data/synth_white_50pcs/pieces.json
+  s_4c9c70849251e4::t_43a04f335827f0 1-683
+  s_4c9c70849251e4::t_ac496ca4829faf 687-809
+  s_4c9c70849251e4::t_dcf8dc6cee322c 810-812
+  s_4c9c70849251e4::t_b0ee7baf0882aa 813-998
+  s_4c9c70849251e4::t_adc309da61930c 684-686
+negative_14pcs_config.yaml
+  s_4c9c70849251e4::t_6faebb35500701 1-65
+data/synth_grayscale_50pcs/pieces.json
+  s_4c9c70849251e4::t_1be63b3803d6fb 789-791
+  s_4c9c70849251e4::t_5cbabe86a1d041 792-998
+  s_4c9c70849251e4::t_43a04f335827f0 1-788
+synth_white_50pcs_config.yaml
+  s_4c9c70849251e4::t_6faebb35500701 1-76
+data/owl_101pcs/pieces.json
+  s_4c9c70849251e4::t_dbe2c68e58aea8 1-975,977,980-1901,1906-1908
+  s_4c9c70849251e4::t_3a1485e8533f0d 976,978-979
+  s_4c9c70849251e4::t_67c3a4e5a71262 1902-1905
+synth_color_50pcs_config.yaml
+  s_4c9c70849251e4::t_6faebb35500701 1-91
+negative_14pcs_best_config.yaml
+  s_4c9c70849251e4::t_6faebb35500701 1-87
+synth_artworks_30pcs_config.yaml
+  s_4c9c70849251e4::t_6faebb35500701 1-80
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "42b841bbb532696c327821deebd92e47a90d2f79",
+  "prompts": {},
+  "sessions": {
+    "s_4c9c70849251e4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1c324d74-cf7a-4f45-ab8a-c6f705db2ee1",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Marcela Brichtova Piptova <marcela.brichtova.piptova@rossum.ai>"
+    }
+  }
+}
