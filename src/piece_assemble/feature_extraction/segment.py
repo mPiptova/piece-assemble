@@ -313,8 +313,12 @@ class OsculatingCircleFeatureExtractor(FeatureExtractor):
                 dist=desc_dist[i, j],
                 piece1=piece1,
                 piece2=piece2,
-                idxs1=np.array(piece1.features.segments[i].interval),
-                idxs2=np.array(piece2.features.segments[j].interval)[::-1],
+                idxs1=np.array(piece1.features.segments[i].interval)
+                + piece1.features.segments[i].offset,
+                idxs2=(
+                    np.array(piece2.features.segments[j].interval)
+                    + piece2.features.segments[j].offset
+                )[::-1],
             )
             for i, j in zip(idxs1, idxs2)
             if not np.isinf(desc_dist[i, j])

@@ -109,15 +109,59 @@ class Piece:
         contour = smooth_contours(outline_contour, sigma)
         holes = [smooth_contours(hole, sigma) for hole in holes if len(hole) > 100]
 
-        features = feature_extractor.extract(
-            contour, feature_extractor.prepare_image(img, mask, img_avg)
-        )
-
+        # Computed from the outline alone, before holes get appended to
+        # `contour` below -- a single polygon ring spanning both would
+        # create bogus edges connecting the outline to each hole.
         polygon = cls._get_polygon_approximation(
             polygon_approximation_tolerance, contour, holes
         )
         polygon = make_valid(polygon)
-        hole_features = None
+
+        prepared_image = feature_extractor.prepare_image(img, mask, img_avg)
+        features = feature_extractor.extract(contour, prepared_image)
+
+        # A piece can have a hole that another piece's tab fits into -- a
+        # match the normal outline-to-outline search would never find, since
+        # an enclosed hole isn't part of the outline contour at all. Treat
+        # each hole's border as more of this piece's own border material:
+        # extract it the same way as the outline, then fold its points and
+        # features onto the end of the piece's own contour/features, with
+        # its segments re-indexed past the ones already there. The matching
+        # and clustering code that follows never needs to know a given
+        # contour index came from a hole rather than the outline -- it's
+        # just more border to search for a matching curve against.
+        #
+        # Only meaningful for a feature extractor that actually produces
+        # segment-indexed features (not e.g. DummyFeatureExtractor, used
+        # where only the piece's geometry matters and no matching happens).
+        hole_features = []
+        can_merge_holes = hasattr(features, "segments")
+        for hole in holes:
+            hole_feature = feature_extractor.extract(hole, prepared_image)
+            hole_features.append(hole_feature)
+
+            if not can_merge_holes:
+                continue
+
+            for segment in hole_feature.segments:
+                segment.offset = len(contour)
+
+            n_segments_before = len(features.segments)
+            features.segments.extend(hole_feature.segments)
+            features.features = np.concatenate(
+                [features.features, hole_feature.features]
+            )
+            features.contour_segment_idxs = np.concatenate(
+                [
+                    features.contour_segment_idxs,
+                    np.where(
+                        hole_feature.contour_segment_idxs == -1,
+                        -1,
+                        hole_feature.contour_segment_idxs + n_segments_before,
+                    ),
+                ]
+            )
+            contour = np.concatenate([contour, hole])
 
         return cls(
             name,
@@ -151,18 +195,6 @@ class Piece:
             polygon = polygon.difference(hole_polygon)
 
         return polygon
-
-    @classmethod
-    def _extract_hole_features(
-        cls, holes: list[Points], img_avg: NpImage
-    ) -> list[Features]:
-        hole_features = []
-
-        for hole in holes:
-            feature = cls.feature_extractor.extract(hole, img_avg)
-            hole_features.append(feature)
-
-        return hole_features
 
     def to_piece(self) -> Piece:
         return self
