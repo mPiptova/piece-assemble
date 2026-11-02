@@ -32,8 +32,8 @@ descriptor:
   angle_w: 0
   # [3, 2]: controls osculating-circle arc segmentation granularity. One
   # necessary bridging match on this dataset is not geometrically correct at
-  # any candidate rank without this value (see docs/evaluation-report-draft.md,
-  # parameter sensitivity).
+  # any candidate rank without this value -- confirmed by a one-factor-at-a-
+  # time sensitivity sweep ([2, 1] and [4, 3] both measurably hurt coverage).
   tol_dists: [3, 2]
 
 cluster:
